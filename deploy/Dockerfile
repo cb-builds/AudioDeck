@@ -1,5 +1,5 @@
-# Use Node.js 18 Alpine as base image
-FROM node:18-alpine
+# Use Node.js 20 Alpine as base image
+FROM node:20-alpine
 
 # Set working directory
 WORKDIR /app
@@ -34,7 +34,9 @@ COPY . .
 RUN mkdir -p backend/clips
 
 # Build frontend
-RUN cd frontend && npm run build
+WORKDIR /app/frontend
+RUN npm run build
+WORKDIR /app
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs
