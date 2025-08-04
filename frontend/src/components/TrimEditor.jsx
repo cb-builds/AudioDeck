@@ -54,7 +54,7 @@ export default function TrimEditor({ clip, originalFileName }) {
       waveColor: "#A44EFF", // Design system primary color - keep purple
       progressColor: "#70FFEA", // Design system selected color - blue progress
       height: 150, // Increased height
-      url: `http://localhost:4000/clips/${clip}`,
+              url: `/clips/${clip}`,
       interact: false, // Disable default interactions
       plugins: [regionsPlugin],
       autoScroll: false, // Disable auto-scroll
@@ -609,7 +609,7 @@ export default function TrimEditor({ clip, originalFileName }) {
       
       console.log("Sending request:", requestBody);
       
-      const res = await fetch("http://localhost:4000/api/trim", {
+              const res = await fetch("/api/trim", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
@@ -721,7 +721,7 @@ export default function TrimEditor({ clip, originalFileName }) {
 
       console.log("Sending trim request:", trimRequestBody);
 
-      const trimRes = await fetch("http://localhost:4000/api/trim", {
+              const trimRes = await fetch("/api/trim", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(trimRequestBody),
@@ -736,7 +736,7 @@ export default function TrimEditor({ clip, originalFileName }) {
       console.log("Trim successful:", trimData);
 
       // Now download the saved file
-      const downloadRes = await fetch(`http://localhost:4000/clips/${trimData.filename}`, {
+              const downloadRes = await fetch(`/clips/${trimData.filename}`, {
         method: "GET",
       });
 

@@ -43,7 +43,7 @@ const UploadForm = ({ onFileUploaded }) => {
     formData.append("audio", fileToUpload);
 
     try {
-      const res = await fetch("http://localhost:4000/api/upload", {
+      const res = await fetch("/api/upload", {
         method: "POST",
         body: formData,
       });
@@ -72,7 +72,7 @@ const UploadForm = ({ onFileUploaded }) => {
       // First, check video duration
       console.log("Checking video duration...");
       try {
-        const durationRes = await fetch(`http://localhost:4000/api/youtube/duration?url=${encodeURIComponent(ytUrl)}`);
+        const durationRes = await fetch(`/api/youtube/duration?url=${encodeURIComponent(ytUrl)}`);
         
         if (durationRes.ok) {
           const durationData = await durationRes.json();
@@ -109,7 +109,7 @@ const UploadForm = ({ onFileUploaded }) => {
       
       try {
         console.log("Attempting to get video title...");
-        const titleRes = await fetch(`http://localhost:4000/api/youtube/title?url=${encodeURIComponent(ytUrl)}`);
+        const titleRes = await fetch(`/api/youtube/title?url=${encodeURIComponent(ytUrl)}`);
         
         if (titleRes.ok) {
           const titleData = await titleRes.json();
@@ -245,7 +245,7 @@ const UploadForm = ({ onFileUploaded }) => {
       console.log("Generated filename:", generatedName);
       
       console.log("Sending download request to backend...");
-      const res = await fetch("http://localhost:4000/api/youtube", {
+              const res = await fetch("/api/youtube", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: ytUrl, name: generatedName }),
