@@ -3,6 +3,8 @@
   <span>AudioDeck</span>
 </h1>
 
+[![Docker Image](https://img.shields.io/badge/Docker%20Image-ghcr.io%2Fcb--builds%2Faudiodeck-blue?style=flat-square&logo=docker)](https://github.com/cb-builds/AudioDeck/packages)
+
 A modern web application for creating and managing audio clips from various video platforms. Upload audio files or download audio from YouTube, TikTok, and Twitch videos to create your personal audio collection.
 
 ## Features ✨
@@ -123,6 +125,12 @@ docker-compose up -d
    - Backend API: http://localhost:4000
 
 ## Quick Deploy 🚀
+
+### Docker Image
+The AudioDeck Docker image is available on GitHub Container Registry:
+```bash
+docker pull ghcr.io/cb-builds/audiodeck:latest
+```
 
 ### For Portainer Users
 1. **Copy this docker-compose.yml content:**
