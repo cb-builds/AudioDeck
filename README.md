@@ -1,7 +1,4 @@
-<h1 style="display: flex; align-items: center; gap: 8px;">
-  <img src="frontend/public/AudioDeck%20Logo.png" alt="AudioDeck Logo" width="80" height="80" />
-  <span>AudioDeck</span>
-</h1>
+# AudioDeck
 
 [![Docker Image](https://img.shields.io/badge/Docker%20Image-ghcr.io%2Fcb--builds%2Faudiodeck-blue?style=flat-square&logo=docker)](https://github.com/cb-builds/AudioDeck/packages)
 
@@ -328,5 +325,3 @@ If you encounter any issues or have questions:
 ---
 
 **AudioDeck** - Your personal audio clip manager 🎵
-#   T r i g g e r   w o r k f l o w  
- 
