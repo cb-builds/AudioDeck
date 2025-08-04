@@ -328,3 +328,5 @@ If you encounter any issues or have questions:
 ---
 
 **AudioDeck** - Your personal audio clip manager 🎵
+#   T r i g g e r   w o r k f l o w  
+ 
