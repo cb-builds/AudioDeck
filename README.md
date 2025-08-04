@@ -1,8 +1,11 @@
-# AudioDeck
+<h1 style="display: flex; align-items: center; gap: 8px;">
+  <img src="frontend/public/AudioDeck%20Logo.png" alt="AudioDeck Logo" width="80" height="80" />
+  <span>AudioDeck</span>
+</h1>
 
-[![Docker Image](https://img.shields.io/badge/Docker%20Image-ghcr.io%2Fcb--builds%2Faudiodeck-blue?style=flat-square&logo=docker)](https://github.com/cb-builds/AudioDeck/packages)
+A modern web application for creating audio clips from various video platforms. Upload and trim audio files or download audio from YouTube, TikTok, and Twitch videos to create your personal audio collection.
 
-A modern web application for creating and managing audio clips from various video platforms. Upload audio files or download audio from YouTube, TikTok, and Twitch videos to create your personal audio collection.
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/U6U22J1R0)
 
 ## Features ✨
 
@@ -18,7 +21,7 @@ A modern web application for creating and managing audio clips from various vide
 ### Frontend
 - **React 18** with Vite
 - **Tailwind CSS** for styling
-- **Custom components** for upload and playback
+- **Wavesurfer.js** for playback
 
 ### Backend
 - **Node.js** with Express
@@ -65,7 +68,7 @@ sudo chmod a+rx /usr/local/bin/yt-dlp
 
 ## Installation 🚀
 
-### Option 1: Docker (Recommended)
+### Option 1: Docker
 
 #### Using Docker Compose
 ```bash
@@ -80,12 +83,7 @@ docker-compose up -d
 # Access the application
 # Frontend & Backend: http://localhost:4000
 ```
-
-#### Using Portainer
-1. **Copy the docker-compose.yml content** from this repository
-2. **Paste it into Portainer** under Stacks > Add Stack
-3. **Deploy the stack**
-4. **Access the application** at `http://your-server-ip:4000`
+The `docker-compose.yml` file can be found [here](https://github.com/cb-builds/AudioDeck/blob/02061af4e1142055fee1768653002a754271158b/deploy/docker-compose.yml).
 
 ### Option 2: Local Development
 
@@ -225,57 +223,7 @@ NODE_ENV=development
 
 ### Static Files
 - `GET /clips/*` - Serve audio files
-
-## Development 🛠️
-
-### Project Structure
-```
-audiodeck-initial/
-├── backend/                    # Node.js backend server
-│   ├── routes/                # API endpoints
-│   │   ├── upload.js
-│   │   ├── youtube.js
-│   │   └── trim.js
-│   ├── cleanup.js             # Automatic file cleanup
-│   ├── server.js              # Main server file
-│   └── package.json
-├── frontend/                   # React frontend application
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── UploadForm.jsx
-│   │   │   ├── Soundboard.jsx
-│   │   │   └── TrimEditor.jsx
-│   │   ├── utils/
-│   │   │   └── textUtils.js
-│   │   ├── App.jsx
-│   │   └── main.jsx
-│   ├── public/
-│   │   └── AudioDeck Logo.png
-│   └── package.json
-├── docs/                       # Documentation
-│   ├── DEPLOYMENT.md
-│   └── DOCKER.md
-├── deploy/                     # Deployment configuration
-│   ├── Dockerfile
-│   ├── docker-compose.yml
-│   ├── nginx.conf
-│   └── .dockerignore
-├── scripts/                    # Utility scripts
-│   ├── setup-git.sh
-│   ├── setup-git.bat
-│   ├── generate-ssl.sh
-│   └── generate-ssl.bat
-├── README.md                   # This file
-├── LICENSE                     # MIT License
-├── package.json                # Root package.json
-├── .gitignore
-└── .gitattributes
-```
-
-### Adding New Features
-1. Backend changes go in `backend/routes/`
-2. Frontend components go in `frontend/src/components/`
-3. Utility functions go in `frontend/src/utils/`
+- 
 
 ## Troubleshooting 🔧
 
@@ -313,7 +261,7 @@ audiodeck-initial/
 
 ## License 📄
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the GPLv3 License - see the LICENSE file for details.
 
 ## Support 💬
 
@@ -325,3 +273,5 @@ If you encounter any issues or have questions:
 ---
 
 **AudioDeck** - Your personal audio clip manager 🎵
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/U6U22J1R0)
