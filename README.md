@@ -1,4 +1,7 @@
-# ![AudioDeck Logo](frontend/public/AudioDeck%20Logo.png) AudioDeck
+<h1 style="display: flex; align-items: center; gap: 8px;">
+  <img src="frontend/public/AudioDeck%20Logo.png" alt="AudioDeck Logo" width="80" height="80" />
+  <span>AudioDeck</span>
+</h1>
 
 A modern web application for creating and managing audio clips from various video platforms. Upload audio files or download audio from YouTube, TikTok, and Twitch videos to create your personal audio collection.
 
@@ -10,7 +13,6 @@ A modern web application for creating and managing audio clips from various vide
 - **Auto Cleanup**: Automatic deletion of old clips after 1 hour
 - **Modern UI**: Beautiful, responsive interface with dark theme
 - **Real-time Feedback**: Custom popup notifications for errors
-- **Audio Management**: Play and manage your audio clips
 
 ## Tech Stack 🛠️
 
@@ -73,6 +75,7 @@ git clone https://github.com/cb-builds/AudioDeck.git
 cd AudioDeck
 
 # Start the application
+cd deploy
 docker-compose up -d
 
 # Access the application
@@ -161,6 +164,8 @@ docker-compose up -d
 2. **Paste into Portainer** under Stacks > Add Stack
 3. **Deploy and access** at `http://your-server-ip:4000`
 
+**Note:** The docker-compose.yml file is located in the `deploy/` directory.
+
 ## Usage 📖
 
 ### Uploading Audio Files
@@ -221,15 +226,15 @@ NODE_ENV=development
 ### Project Structure
 ```
 audiodeck-initial/
-├── backend/
-│   ├── routes/
+├── backend/                    # Node.js backend server
+│   ├── routes/                # API endpoints
 │   │   ├── upload.js
 │   │   ├── youtube.js
 │   │   └── trim.js
-│   ├── cleanup.js
-│   ├── server.js
+│   ├── cleanup.js             # Automatic file cleanup
+│   ├── server.js              # Main server file
 │   └── package.json
-├── frontend/
+├── frontend/                   # React frontend application
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── UploadForm.jsx
@@ -242,19 +247,24 @@ audiodeck-initial/
 │   ├── public/
 │   │   └── AudioDeck Logo.png
 │   └── package.json
-├── scripts/
+├── docs/                       # Documentation
+│   ├── DEPLOYMENT.md
+│   └── DOCKER.md
+├── deploy/                     # Deployment configuration
+│   ├── Dockerfile
+│   ├── docker-compose.yml
+│   ├── nginx.conf
+│   └── .dockerignore
+├── scripts/                    # Utility scripts
 │   ├── setup-git.sh
 │   ├── setup-git.bat
 │   ├── generate-ssl.sh
 │   └── generate-ssl.bat
-├── docker-compose.yml
-├── docker-compose.portainer.yml
-├── Dockerfile
-├── nginx.conf
-├── README.md
-├── DEPLOYMENT.md
-├── DOCKER.md
-└── LICENSE
+├── README.md                   # This file
+├── LICENSE                     # MIT License
+├── package.json                # Root package.json
+├── .gitignore
+└── .gitattributes
 ```
 
 ### Adding New Features
