@@ -1,0 +1,35 @@
+name: Create Package First
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create-package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Create package
+      run: |
+        echo "Creating package..."
+        curl -X POST \
+          -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/user/packages/container/audiodeck \
+          -d '{"name":"audiodeck","description":"AudioDeck application"}'
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./deploy/Dockerfile
+        push: true
+        tags: ghcr.io/cb-builds/audiodeck:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        provenance: false 
