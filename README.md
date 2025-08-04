@@ -1,6 +1,4 @@
-# AudioDeck
-
-![AudioDeck Logo](frontend/public/AudioDeck%20Logo.png)
+# ![AudioDeck Logo](frontend/public/AudioDeck%20Logo.png) AudioDeck
 
 A modern web application for creating and managing audio clips from various video platforms. Upload audio files or download audio from YouTube, TikTok, and Twitch videos to create your personal audio collection.
 
