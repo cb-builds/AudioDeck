@@ -19,6 +19,15 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
+    - name: Create package if it doesn't exist
+      run: |
+        echo "Attempting to create package..."
+        curl -X POST \
+          -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/user/packages/container/audiodeck \
+          -d '{"name":"audiodeck","description":"AudioDeck application"}' || echo "Package might already exist"
+
     - name: Log in to Container Registry
       uses: docker/login-action@v3
       with:
