@@ -33,7 +33,7 @@ jobs:
         file: ./deploy/Dockerfile
         push: true
         tags: |
-          ghcr.io/${{ github.repository }}:latest
-          ghcr.io/${{ github.repository }}:${{ github.sha }}
+          ghcr.io/cb-builds/audiodeck:latest
+          ghcr.io/cb-builds/audiodeck:${{ github.sha }}
         cache-from: type=gha
         cache-to: type=gha,mode=max 
