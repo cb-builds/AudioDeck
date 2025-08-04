@@ -1,0 +1,33 @@
+name: Link Package to Repository
+
+on:
+  workflow_dispatch:
+
+jobs:
+  link-package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Link package to repository
+      run: |
+        echo "Linking package to repository..."
+        curl -X POST \
+          -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/cb-builds/AudioDeck/packages/container/audiodeck \
+          -d '{"repository_id": "cb-builds/AudioDeck"}'
+
+    - name: Make package public
+      run: |
+        echo "Making package public..."
+        curl -X PATCH \
+          -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/user/packages/container/audiodeck \
+          -d '{"visibility": "public"}' 
