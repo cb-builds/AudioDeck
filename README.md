@@ -64,10 +64,33 @@ sudo chmod a+rx /usr/local/bin/yt-dlp
 
 ## Installation 🚀
 
+### Option 1: Docker (Recommended)
+
+#### Using Docker Compose
+```bash
+# Clone the repository
+git clone https://github.com/cb-builds/AudioDeck.git
+cd AudioDeck
+
+# Start the application
+docker-compose up -d
+
+# Access the application
+# Frontend & Backend: http://localhost:4000
+```
+
+#### Using Portainer
+1. **Copy the docker-compose.yml content** from this repository
+2. **Paste it into Portainer** under Stacks > Add Stack
+3. **Deploy the stack**
+4. **Access the application** at `http://your-server-ip:4000`
+
+### Option 2: Local Development
+
 1. **Clone the repository**
    ```bash
-   git clone <your-repo-url>
-   cd audiodeck-initial
+   git clone https://github.com/cb-builds/AudioDeck.git
+   cd AudioDeck
    ```
 
 2. **Install dependencies**
@@ -95,6 +118,48 @@ sudo chmod a+rx /usr/local/bin/yt-dlp
 4. **Access the application**
    - Frontend: http://localhost:5173
    - Backend API: http://localhost:4000
+
+## Quick Deploy 🚀
+
+### For Portainer Users
+1. **Copy this docker-compose.yml content:**
+   ```yaml
+   version: '3.8'
+   
+   services:
+     audiodeck:
+       build: .
+       container_name: audiodeck-app
+       ports:
+         - "4000:4000"
+       volumes:
+         - audiodeck_clips:/app/backend/clips
+         - audiodeck_logs:/app/logs
+       environment:
+         - NODE_ENV=production
+         - PORT=4000
+         - MAX_FILE_SIZE=26214400
+         - MAX_DURATION=1200
+         - CLEANUP_INTERVAL=1800000
+         - FILE_EXPIRY=3600000
+         - MAX_STORAGE=524288000
+       restart: unless-stopped
+       healthcheck:
+         test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/api/test', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+         interval: 30s
+         timeout: 10s
+         retries: 3
+         start_period: 40s
+   
+   volumes:
+     audiodeck_clips:
+       driver: local
+     audiodeck_logs:
+       driver: local
+   ```
+
+2. **Paste into Portainer** under Stacks > Add Stack
+3. **Deploy and access** at `http://your-server-ip:4000`
 
 ## Usage 📖
 

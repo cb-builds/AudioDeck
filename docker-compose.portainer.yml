@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   audiodeck:
-    build: .
+    image: ghcr.io/cb-builds/audiodeck:latest
     container_name: audiodeck-app
     ports:
       - "4000:4000"
