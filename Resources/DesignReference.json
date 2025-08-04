@@ -1,0 +1,109 @@
+{
+  "designSystem": {
+    "name": "AudioDeck Dark UI",
+    "mode": "dark",
+    "typography": {
+      "fontFamily": "Inter, sans-serif",
+      "fontWeight": {
+        "heading": 700,
+        "label": 500,
+        "body": 400
+      },
+      "fontSize": {
+        "heading": "2rem",
+        "label": "1rem",
+        "body": "0.95rem"
+      },
+      "lineHeight": "1.5"
+    },
+    "colors": {
+      "background": "#0D0F23",
+      "surface": "#14162B",
+      "panel": "#1A1C33",
+      "textPrimary": "#FFFFFF",
+      "textSecondary": "#A3A6C5",
+      "accentGradient": {
+        "from": "#A44EFF",
+        "to": "#427BFF"
+      },
+      "successGradient": {
+        "from": "#36D1DC",
+        "to": "#5B86E5"
+      },
+      "regionColor": "rgba(167, 139, 250, 0.3)",
+      "waveformPrimary": "#A44EFF",
+      "waveformSelected": "#70FFEA"
+    },
+    "buttons": {
+      "primary": {
+        "background": "linear-gradient(to right, #A44EFF, #427BFF)",
+        "color": "#FFFFFF",
+        "borderRadius": "1.5rem",
+        "fontWeight": "600",
+        "padding": "0.75rem 1.5rem",
+        "icon": {
+          "color": "#E0B7FF",
+          "size": "1rem"
+        }
+      },
+      "secondary": {
+        "background": "linear-gradient(to right, #36D1DC, #5B86E5)",
+        "color": "#FFFFFF",
+        "borderRadius": "1.5rem",
+        "fontWeight": "600",
+        "padding": "0.75rem 1.5rem"
+      },
+      "iconOnly": {
+        "shape": "rounded",
+        "background": "#26284D",
+        "iconColor": "#A44EFF",
+        "hoverOpacity": 0.9
+      }
+    },
+    "inputs": {
+      "background": "#1E203A",
+      "borderRadius": "0.75rem",
+      "color": "#FFFFFF",
+      "placeholderColor": "#7275A8",
+      "padding": "0.75rem 1rem",
+      "border": "none",
+      "focusOutline": "2px solid #A44EFF"
+    },
+    "cards": {
+      "background": "#14162B",
+      "padding": "1.25rem",
+      "borderRadius": "1rem",
+      "boxShadow": "0 0 10px rgba(0, 0, 0, 0.2)"
+    },
+    "layout": {
+      "padding": "2rem",
+      "maxWidth": "1200px",
+      "gap": "2rem",
+      "borderRadius": "1.25rem",
+      "alignment": "centered"
+    },
+    "waveform": {
+      "height": 128,
+      "waveColor": "#A44EFF",
+      "progressColor": "#70FFEA",
+      "cursorColor": "#FFFFFF",
+      "regionColor": "rgba(167, 139, 250, 0.3)",
+      "backgroundColor": "transparent"
+    },
+    "icons": {
+      "style": "minimal",
+      "color": "#A44EFF",
+      "size": "1rem",
+      "spacing": "0.5rem"
+    },
+    "effects": {
+      "transition": "all 0.3s ease-in-out",
+      "hover": {
+        "button": {
+          "scale": 1.03,
+          "brightness": 1.1
+        }
+      }
+    }
+  }
+}

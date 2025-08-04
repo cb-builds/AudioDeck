@@ -1,0 +1,42 @@
+{
+  "name": "audiodeck",
+  "version": "1.0.0",
+  "description": "A modern web application for creating and managing audio clips from various video platforms",
+  "main": "index.js",
+  "scripts": {
+    "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "backend": "cd backend && npm start",
+    "frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "start": "cd backend && npm start",
+    "clean": "cd backend && node cleanup.js"
+  },
+  "keywords": [
+    "audio",
+    "soundboard",
+    "youtube",
+    "tiktok",
+    "twitch",
+    "react",
+    "nodejs",
+    "express"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "your-repo-url"
+  },
+  "bugs": {
+    "url": "your-repo-url/issues"
+  },
+  "homepage": "your-repo-url#readme"
+} 
