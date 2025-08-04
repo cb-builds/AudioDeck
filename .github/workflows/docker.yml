@@ -23,7 +23,7 @@ jobs:
       run: |
         echo "Attempting to create package..."
         curl -X POST \
-          -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
           -H "Accept: application/vnd.github.v3+json" \
           https://api.github.com/user/packages/container/audiodeck \
           -d '{"name":"audiodeck","description":"AudioDeck application"}' || echo "Package might already exist"
@@ -33,7 +33,7 @@ jobs:
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+        password: ${{ secrets.PAT_TOKEN }}
 
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
