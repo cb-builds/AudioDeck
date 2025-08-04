@@ -169,6 +169,7 @@ typings/
 # AudioDeck specific
 backend/clips/
 backend/uploads/
+Resources/
 *.mp3
 *.m4a
 *.wav

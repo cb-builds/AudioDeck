@@ -1,6 +1,8 @@
-# AudioDeck 🎵
+# AudioDeck
 
-A modern web application for creating and managing audio clips from various video platforms. Upload audio files or download audio from YouTube, TikTok, and Twitch videos to create your personal soundboard.
+![AudioDeck Logo](frontend/public/AudioDeck%20Logo.png)
+
+A modern web application for creating and managing audio clips from various video platforms. Upload audio files or download audio from YouTube, TikTok, and Twitch videos to create your personal audio collection.
 
 ## Features ✨
 
@@ -10,7 +12,7 @@ A modern web application for creating and managing audio clips from various vide
 - **Auto Cleanup**: Automatic deletion of old clips after 1 hour
 - **Modern UI**: Beautiful, responsive interface with dark theme
 - **Real-time Feedback**: Custom popup notifications for errors
-- **Soundboard**: Play and manage your audio clips
+- **Audio Management**: Play and manage your audio clips
 
 ## Tech Stack 🛠️
 
@@ -178,7 +180,7 @@ docker-compose up -d
 4. Audio will be downloaded and converted automatically
 
 ### Playing Audio Clips
-- Click on any clip in the soundboard to play it
+- Click on any clip in the audio collection to play it
 - Clips are automatically cleaned up after 1 hour
 
 ## Configuration ⚙️
@@ -239,8 +241,22 @@ audiodeck-initial/
 │   │   │   └── textUtils.js
 │   │   ├── App.jsx
 │   │   └── main.jsx
+│   ├── public/
+│   │   └── AudioDeck Logo.png
 │   └── package.json
-└── README.md
+├── scripts/
+│   ├── setup-git.sh
+│   ├── setup-git.bat
+│   ├── generate-ssl.sh
+│   └── generate-ssl.bat
+├── docker-compose.yml
+├── docker-compose.portainer.yml
+├── Dockerfile
+├── nginx.conf
+├── README.md
+├── DEPLOYMENT.md
+├── DOCKER.md
+└── LICENSE
 ```
 
 ### Adding New Features
