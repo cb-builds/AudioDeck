@@ -59,9 +59,10 @@ export default function TrimEditor({ clip, originalFileName }) {
       plugins: [regionsPlugin],
       autoScroll: false, // Disable auto-scroll
       scrollParent: false, // Disable scroll parent
-      backend: 'WebAudio', // Use WebAudio backend for better compatibility
+      backend: 'MediaElement', // Try MediaElement backend first for better compatibility
       mediaControls: false, // Disable media controls
       responsive: true, // Make it responsive
+      normalize: true, // Normalize audio for better visualization
     });
 
     // Create separate audio element for playback
@@ -119,6 +120,77 @@ export default function TrimEditor({ clip, originalFileName }) {
       // Try alternative URL if the first one fails
       console.log("Trying alternative URL...");
       wavesurfer.load(`/clips/${clip}`);
+    });
+
+    // Add a fallback mechanism for different backends
+    wavesurfer.on("error", (error) => {
+      console.error("WaveSurfer error:", error);
+      console.error("Error details:", {
+        code: error.code,
+        message: error.message,
+        clip: clip,
+        url: `/clips/${clip}`
+      });
+      
+      // If MediaElement backend fails, try WebAudio backend
+      if (wavesurfer.backend && wavesurfer.backend.name === 'MediaElement') {
+        console.log("MediaElement backend failed, trying WebAudio backend...");
+        setStatus("Trying alternative audio backend...");
+        
+        // Destroy current instance and recreate with WebAudio backend
+        wavesurfer.destroy();
+        
+        const fallbackWavesurfer = WaveSurfer.create({
+          container: containerRef.current,
+          waveColor: "#A44EFF",
+          progressColor: "#70FFEA",
+          height: 150,
+          url: `http://localhost:4000/clips/${clip}`,
+          interact: false,
+          plugins: [regionsPlugin],
+          autoScroll: false,
+          scrollParent: false,
+          backend: 'WebAudio', // Try WebAudio as fallback
+          mediaControls: false,
+          responsive: true,
+          normalize: true,
+          hideScrollbar: true,
+        });
+        
+        // Set up the same event handlers for the fallback
+        fallbackWavesurfer.on("ready", () => {
+          wavesurferRef.current = fallbackWavesurfer;
+          regionsRef.current = regionsPlugin;
+          setIsReady(true);
+          setDuration(fallbackWavesurfer.getDuration());
+          console.log("Fallback WaveSurfer ready");
+          
+          // Add default region
+          try {
+            const defaultRegion = regionsRef.current.addRegion({
+              start: 0,
+              end: 5,
+              color: "rgba(135, 206, 250, 0.3)",
+              drag: !shouldDisableDrag(),
+              resize: true,
+            });
+            
+            regionRef.current = defaultRegion;
+            setStartTime("0.00");
+            setEndTime("5.00");
+          } catch (error) {
+            console.error("Error creating default region:", error);
+            setStatus("Error creating default region: " + error.message);
+          }
+        });
+        
+        fallbackWavesurfer.on("error", (fallbackError) => {
+          console.error("Fallback WaveSurfer also failed:", fallbackError);
+          setStatus("Failed to load audio file with both backends");
+        });
+      } else {
+        setStatus("WaveSurfer error: " + error.message);
+      }
     });
 
     // Listen for all possible region events

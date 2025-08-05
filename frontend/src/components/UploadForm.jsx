@@ -14,6 +14,7 @@ const UploadForm = ({ onFileUploaded }) => {
   const [showProgress, setShowProgress] = useState(false);
   const [progressValue, setProgressValue] = useState(0);
   const [progressText, setProgressText] = useState("");
+  const [currentVideoName, setCurrentVideoName] = useState("");
 
   const showErrorPopup = (title, message) => {
     setPopupTitle(title);
@@ -111,8 +112,8 @@ const UploadForm = ({ onFileUploaded }) => {
     
     console.log("=== Starting video download ===");
     setIsVideoUploading(true);
-    startProgress("Checking video duration...");
-    setStatus("Checking video duration...");
+    startProgress("Getting Video Metadata...");
+    setStatus("Getting Video Metadata...");
     
     try {
       console.log("Starting video download for URL:", ytUrl);
@@ -156,7 +157,7 @@ const UploadForm = ({ onFileUploaded }) => {
       }
       
       console.log("Proceeding to download phase...");
-      updateProgress(25, "Downloading video...");
+      startProgress("Downloading video...");
       setStatus("Downloading video...");
       
       // Get video title before downloading
@@ -256,6 +257,9 @@ const UploadForm = ({ onFileUploaded }) => {
         }
       }
       
+      // Store the video name in state for use in SSE handler
+      setCurrentVideoName(videoName);
+      
       console.log("Making download request to /api/youtube");
       const res = await fetch("/api/youtube", {
         method: "POST",
@@ -306,23 +310,17 @@ const UploadForm = ({ onFileUploaded }) => {
       }
       
       const data = await res.json();
-      console.log("Download successful:", data);
+      console.log("Download started:", data);
       
       // Start listening for progress updates if we have a downloadId
       if (data.downloadId) {
         console.log("Starting progress tracking for downloadId:", data.downloadId);
-        startProgressTracking(data.downloadId);
+        startProgressTracking(data.downloadId, currentVideoName);
       } else {
         // Fallback to simulated progress
         updateProgress(75, "Processing audio...");
         setStatus("Processing audio...");
       }
-      
-      console.log("Download successful, updating progress to 100%");
-      updateProgress(100, "Download complete!");
-      setStatus("Download complete!");
-      
-      setStatus(`Uploaded: ${data.filename}`);
       
       // Truncate video name for display
       const truncatedVideoName = truncateText(videoName, 50);
@@ -331,13 +329,6 @@ const UploadForm = ({ onFileUploaded }) => {
       if (onFileUploaded) {
         onFileUploaded(data.filename, truncatedVideoName);
       }
-      
-      // Hide progress after a delay
-      console.log("Setting timeout to hide progress in 2 seconds");
-      setTimeout(() => {
-        console.log("Hiding progress bar");
-        hideProgress();
-      }, 2000);
       
     } catch (err) {
       console.error("Video upload error:", err);
@@ -348,7 +339,7 @@ const UploadForm = ({ onFileUploaded }) => {
     }
   };
 
-  const startProgressTracking = (downloadId) => {
+  const startProgressTracking = (downloadId, videoName) => {
     console.log("Starting SSE connection for progress tracking");
     
     const eventSource = new EventSource(`/api/youtube/progress/${downloadId}`);
@@ -356,6 +347,10 @@ const UploadForm = ({ onFileUploaded }) => {
     eventSource.onopen = () => {
       console.log("SSE connection opened");
     };
+    
+    // Store the downloadId and video name for use in completion
+    let currentDownloadId = downloadId;
+    let currentVideoName = videoName;
     
     eventSource.onmessage = (event) => {
       try {
@@ -366,6 +361,7 @@ const UploadForm = ({ onFileUploaded }) => {
           const progress = data.progress || 0;
           const downloadedBytes = data.downloadedBytes || 0;
           const totalBytes = data.totalBytes || 0;
+          const status = data.status || 'downloading';
           
           // Format bytes for display
           const formatBytes = (bytes) => {
@@ -379,8 +375,35 @@ const UploadForm = ({ onFileUploaded }) => {
           const downloadedFormatted = formatBytes(downloadedBytes);
           const totalFormatted = formatBytes(totalBytes);
           
+          // Check for error status
+          if (status === 'error') {
+            const errorMessage = data.error || 'Download failed';
+            hideProgress();
+            showErrorPopup("❌ Download Failed", errorMessage);
+            setStatus(`Download failed: ${errorMessage}`);
+            return;
+          }
+          
           updateProgress(progress, `Downloading: ${downloadedFormatted} / ${totalFormatted}`);
           setStatus(`Downloading: ${downloadedFormatted} / ${totalFormatted}`);
+          
+          // If progress is 100% or status is complete, handle completion
+          if (progress >= 100 || status === 'complete') {
+            // Extract filename from downloadId (assuming format: downloadId_imported_video.mp3)
+            const filename = `${currentDownloadId}_imported_video.mp3`;
+            const truncatedVideoName = truncateText(currentVideoName, 50);
+            
+
+            
+            // Notify parent component about the uploaded file
+            if (onFileUploaded) {
+              onFileUploaded(filename, truncatedVideoName);
+            }
+            
+            setTimeout(() => {
+              hideProgress();
+            }, 2000);
+          }
         }
       } catch (error) {
         console.error("Error parsing SSE data:", error);
