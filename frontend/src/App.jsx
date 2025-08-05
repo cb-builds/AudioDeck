@@ -15,7 +15,7 @@ function App() {
     script.onload = () => {
       // Initialize the widget after script loads
       if (window.kofiWidgetOverlay) {
-        window.kofiWidgetOverlay.draw('kryptikos', {
+        window.kofiWidgetOverlay.draw('U6U22J1R0', {
           'type': 'floating-chat',
           'floating-chat.donateButton.text': 'Support me',
           'floating-chat.donateButton.background-color': '#794bc4',

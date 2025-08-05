@@ -307,25 +307,45 @@ router.post("/", (req, res) => {
 
     console.log("yt-dlp stdout:", stdout);
 
-    // Check file size (25MB limit)
-    const maxSize = 25 * 1024 * 1024; // 25MB in bytes
-    const stats = fs.statSync(outputPath);
-    if (stats.size > maxSize) {
-      fs.unlinkSync(outputPath);
-      // Update download status
+    // Check if file exists before checking size
+    try {
+      if (fs.existsSync(outputPath)) {
+        // Check file size (25MB limit)
+        const maxSize = 25 * 1024 * 1024; // 25MB in bytes
+        const stats = fs.statSync(outputPath);
+        if (stats.size > maxSize) {
+          fs.unlinkSync(outputPath);
+          // Update download status
+          const download = activeDownloads.get(downloadId);
+          if (download) {
+            download.status = 'error';
+            download.error = 'File too large';
+          }
+          // Note: Can't send error response since we already sent the initial response
+          console.error("File too large: File exceeds 25MB limit");
+        } else {
+          // Update download status to complete
+          const download = activeDownloads.get(downloadId);
+          if (download) {
+            download.status = 'complete';
+            download.progress = 100;
+          }
+        }
+      } else {
+        // File doesn't exist, which means download failed
+        console.error("Download failed: Output file does not exist");
+        const download = activeDownloads.get(downloadId);
+        if (download) {
+          download.status = 'error';
+          download.error = 'Download failed - invalid URL or unsupported content';
+        }
+      }
+    } catch (fileError) {
+      console.error("Error checking file:", fileError);
       const download = activeDownloads.get(downloadId);
       if (download) {
         download.status = 'error';
-        download.error = 'File too large';
-      }
-      // Note: Can't send error response since we already sent the initial response
-      console.error("File too large: File exceeds 25MB limit");
-    } else {
-      // Update download status to complete
-      const download = activeDownloads.get(downloadId);
-      if (download) {
-        download.status = 'complete';
-        download.progress = 100;
+        download.error = 'Download failed - file system error';
       }
     }
 
