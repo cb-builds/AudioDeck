@@ -22,17 +22,20 @@ const UploadForm = ({ onFileUploaded }) => {
   };
 
   const startProgress = (text) => {
+    console.log("startProgress called with:", text);
     setShowProgress(true);
     setProgressValue(0);
     setProgressText(text);
   };
 
   const updateProgress = (value, text) => {
+    console.log("updateProgress called with:", value, text);
     setProgressValue(value);
     if (text) setProgressText(text);
   };
 
   const hideProgress = () => {
+    console.log("hideProgress called");
     setShowProgress(false);
     setProgressValue(0);
     setProgressText("");
@@ -106,6 +109,7 @@ const UploadForm = ({ onFileUploaded }) => {
   const handleYoutubeDownload = async () => {
     if (!ytUrl) return setStatus("Please enter a video URL.");
     
+    console.log("=== Starting video download ===");
     setIsVideoUploading(true);
     startProgress("Checking video duration...");
     setStatus("Checking video duration...");
@@ -116,7 +120,9 @@ const UploadForm = ({ onFileUploaded }) => {
       // First, check video duration
       console.log("Checking video duration...");
       try {
+        console.log("Making duration request to:", `/api/youtube/duration?url=${encodeURIComponent(ytUrl)}`);
         const durationRes = await fetch(`/api/youtube/duration?url=${encodeURIComponent(ytUrl)}`);
+        console.log("Duration response status:", durationRes.status);
         
         if (durationRes.ok) {
           const durationData = await durationRes.json();
@@ -140,16 +146,20 @@ const UploadForm = ({ onFileUploaded }) => {
             console.log("Duration check passed, video is within limit");
           }
         } else {
-          console.log("Could not check duration, proceeding with download");
+          console.log("Duration response not ok, status:", durationRes.status);
+          const errorText = await durationRes.text();
+          console.log("Duration error response:", errorText);
         }
       } catch (durationError) {
-        console.log("Duration check failed, proceeding with download:", durationError);
+        console.log("Duration check failed with error:", durationError);
         // Don't hide progress here - let the download continue
       }
       
+      console.log("Proceeding to download phase...");
       updateProgress(25, "Downloading video...");
       setStatus("Downloading video...");
       
+      console.log("Making download request to /api/youtube");
       const res = await fetch("/api/youtube", {
         method: "POST",
         headers: {
@@ -158,6 +168,7 @@ const UploadForm = ({ onFileUploaded }) => {
         body: JSON.stringify({ url: ytUrl }),
       });
       
+      console.log("Download response status:", res.status);
       updateProgress(75, "Processing audio...");
       setStatus("Processing audio...");
       
@@ -196,6 +207,7 @@ const UploadForm = ({ onFileUploaded }) => {
         throw new Error(errorData.error || 'Video upload failed');
       }
       
+      console.log("Download successful, updating progress to 100%");
       updateProgress(100, "Download complete!");
       setStatus("Download complete!");
       
@@ -209,7 +221,9 @@ const UploadForm = ({ onFileUploaded }) => {
       }
       
       // Hide progress after a delay
+      console.log("Setting timeout to hide progress in 2 seconds");
       setTimeout(() => {
+        console.log("Hiding progress bar");
         hideProgress();
       }, 2000);
       
