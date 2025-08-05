@@ -15,6 +15,7 @@ const UploadForm = ({ onFileUploaded }) => {
   const [progressValue, setProgressValue] = useState(0);
   const [progressText, setProgressText] = useState("");
   const [currentVideoName, setCurrentVideoName] = useState("");
+  const [activeSSEConnections, setActiveSSEConnections] = useState(new Set());
 
   const showErrorPopup = (title, message) => {
     setPopupTitle(title);
@@ -342,6 +343,15 @@ const UploadForm = ({ onFileUploaded }) => {
   const startProgressTracking = (downloadId, videoName) => {
     console.log("Starting SSE connection for progress tracking");
     
+    // Check if we already have an active connection for this downloadId
+    if (activeSSEConnections.has(downloadId)) {
+      console.log("SSE connection already exists for downloadId:", downloadId);
+      return;
+    }
+    
+    // Add this connection to the active set
+    setActiveSSEConnections(prev => new Set([...prev, downloadId]));
+    
     const eventSource = new EventSource(`/api/youtube/progress/${downloadId}`);
     
     eventSource.onopen = () => {
@@ -352,6 +362,7 @@ const UploadForm = ({ onFileUploaded }) => {
     let currentDownloadId = downloadId;
     let currentVideoName = videoName;
     let completionHandled = false; // Flag to prevent multiple completion calls
+    let errorHandled = false; // Flag to prevent multiple error popups
     
     eventSource.onmessage = (event) => {
       try {
@@ -377,11 +388,19 @@ const UploadForm = ({ onFileUploaded }) => {
           const totalFormatted = formatBytes(totalBytes);
           
           // Check for error status
-          if (status === 'error') {
+          if (status === 'error' && !errorHandled) {
+            errorHandled = true; // Mark as handled to prevent duplicate popups
             const errorMessage = data.error || 'Download failed';
             hideProgress();
             showErrorPopup("❌ Download Failed", errorMessage);
             setStatus(`Download failed: ${errorMessage}`);
+            eventSource.close(); // Close SSE connection immediately
+            // Remove from active connections
+            setActiveSSEConnections(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(currentDownloadId);
+              return newSet;
+            });
             return;
           }
           
@@ -403,6 +422,13 @@ const UploadForm = ({ onFileUploaded }) => {
             
             setTimeout(() => {
               hideProgress();
+              eventSource.close(); // Close SSE connection after completion
+              // Remove from active connections
+              setActiveSSEConnections(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(currentDownloadId);
+                return newSet;
+              });
             }, 2000);
           }
         }

@@ -5,12 +5,19 @@
   "main": "index.js",
   "scripts": {
     "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install",
-    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "dev": "concurrently \"npm run backend:dev\" \"npm run frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
     "backend": "cd backend && npm start",
+    "backend:dev": "cd backend && npm run dev",
     "frontend": "cd frontend && npm run dev",
     "build": "cd frontend && npm run build",
     "start": "cd backend && npm start",
-    "clean": "cd backend && node cleanup.js"
+    "start:prod": "cd backend && npm run start:prod",
+    "clean": "cd backend && node cleanup.js",
+    "restart": "npm run clean && npm run dev",
+    "start:dev": "node scripts/start-dev.js",
+    "start:prod": "node scripts/start-prod.js"
   },
   "keywords": [
     "audio",
