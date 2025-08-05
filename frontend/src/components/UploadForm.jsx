@@ -144,6 +144,7 @@ const UploadForm = ({ onFileUploaded }) => {
         }
       } catch (durationError) {
         console.log("Duration check failed, proceeding with download:", durationError);
+        // Don't hide progress here - let the download continue
       }
       
       updateProgress(25, "Downloading video...");

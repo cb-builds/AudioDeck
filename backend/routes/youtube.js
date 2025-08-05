@@ -6,6 +6,84 @@ const fs = require("fs");
 
 const CLIPS_DIR = path.join(__dirname, "../clips");
 
+// GET /api/youtube/duration - Check video duration
+router.get("/duration", async (req, res) => {
+  const { url } = req.query;
+
+  if (!url) {
+    return res.status(400).json({ error: "Missing video URL." });
+  }
+
+  try {
+    // Use yt-dlp to get video duration
+    let durationCmd;
+    if (url.includes('twitch.tv')) {
+      // Enhanced Twitch duration extraction with proper headers
+      console.log("Checking duration for Twitch URL:", url);
+      
+      durationCmd = `yt-dlp --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.twitch.tv/" --add-header "Client-Id:kimne78kx3ncx6brgo4mv6wki5h1ko" "${url}"`;
+    } else {
+      // Standard command for other platforms
+      durationCmd = `yt-dlp --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${url}"`;
+    }
+    
+    exec(durationCmd, (err, stdout, stderr) => {
+      if (err) {
+        console.error("Duration check error:", err);
+        console.error("stderr:", stderr);
+        
+        // If we can't get duration, allow the download to proceed
+        // The backend will handle duration limits during actual download
+        return res.json({ 
+          duration: 0, 
+          isTooLong: false,
+          message: "Could not check duration, proceeding with download" 
+        });
+      }
+
+      const durationStr = stdout.trim();
+      if (!durationStr) {
+        return res.json({ 
+          duration: 0, 
+          isTooLong: false,
+          message: "No duration found, proceeding with download" 
+        });
+      }
+
+      // Parse duration string (format: HH:MM:SS or MM:SS)
+      const parts = durationStr.split(':').map(Number);
+      let durationSeconds = 0;
+      
+      if (parts.length === 3) {
+        // HH:MM:SS format
+        durationSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+      } else if (parts.length === 2) {
+        // MM:SS format
+        durationSeconds = parts[0] * 60 + parts[1];
+      } else {
+        // Just seconds
+        durationSeconds = parts[0];
+      }
+
+      const maxDuration = 20 * 60; // 20 minutes in seconds
+      const isTooLong = durationSeconds > maxDuration;
+
+      res.json({ 
+        duration: durationSeconds, 
+        isTooLong: isTooLong,
+        durationFormatted: durationStr
+      });
+    });
+  } catch (error) {
+    console.error("Duration check failed:", error);
+    res.json({ 
+      duration: 0, 
+      isTooLong: false,
+      message: "Duration check failed, proceeding with download" 
+    });
+  }
+});
+
 // GET /api/youtube/title - Extract video title
 router.get("/title", async (req, res) => {
   const { url } = req.query;
@@ -101,65 +179,6 @@ router.get("/title", async (req, res) => {
   } catch (error) {
     console.error("Title extraction failed:", error);
     res.status(500).json({ error: "Title extraction failed", details: error.message });
-  }
-});
-
-// GET /api/youtube/duration - Check video duration
-router.get("/duration", async (req, res) => {
-  const { url } = req.query;
-
-  if (!url) {
-    return res.status(400).json({ error: "Missing video URL." });
-  }
-
-  try {
-    // Use yt-dlp to get video duration
-    let durationCmd;
-    if (url.includes('twitch.tv')) {
-      durationCmd = `yt-dlp --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.twitch.tv/" --add-header "Client-Id:kimne78kx3ncx6brgo4mv6wki5h1ko" "${url}"`;
-    } else {
-      durationCmd = `yt-dlp --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${url}"`;
-    }
-    
-    exec(durationCmd, (err, stdout, stderr) => {
-      if (err) {
-        console.error("Duration extraction error:", err);
-        console.error("stderr:", stderr);
-        return res.status(500).json({ error: "Could not extract video duration", details: err.message });
-      }
-
-      const durationStr = stdout.trim();
-      if (!durationStr) {
-        return res.status(404).json({ error: "No duration found for this video" });
-      }
-
-      // Parse duration (format: HH:MM:SS or MM:SS)
-      const parts = durationStr.split(':').map(Number);
-      let seconds = 0;
-      
-      if (parts.length === 3) {
-        // HH:MM:SS format
-        seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
-      } else if (parts.length === 2) {
-        // MM:SS format
-        seconds = parts[0] * 60 + parts[1];
-      } else {
-        // Just seconds
-        seconds = parts[0];
-      }
-
-      const maxDuration = 20 * 60; // 20 minutes in seconds
-      
-      res.json({ 
-        duration: seconds,
-        durationStr: durationStr,
-        isTooLong: seconds > maxDuration,
-        maxDuration: maxDuration
-      });
-    });
-  } catch (error) {
-    console.error("Duration extraction failed:", error);
-    res.status(500).json({ error: "Duration extraction failed", details: error.message });
   }
 });
 
