@@ -165,7 +165,10 @@ const UploadForm = ({ onFileUploaded }) => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url: ytUrl }),
+        body: JSON.stringify({ 
+          url: ytUrl,
+          name: "imported_video" // Add the required name parameter
+        }),
       });
       
       console.log("Download response status:", res.status);
