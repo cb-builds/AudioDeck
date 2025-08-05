@@ -269,8 +269,6 @@ const UploadForm = ({ onFileUploaded }) => {
       });
       
       console.log("Download response status:", res.status);
-      updateProgress(75, "Processing audio...");
-      setStatus("Processing audio...");
       
       if (!res.ok) {
         const errorData = await res.json();
@@ -307,12 +305,23 @@ const UploadForm = ({ onFileUploaded }) => {
         throw new Error(errorData.error || 'Video upload failed');
       }
       
+      const data = await res.json();
+      console.log("Download successful:", data);
+      
+      // Start listening for progress updates if we have a downloadId
+      if (data.downloadId) {
+        console.log("Starting progress tracking for downloadId:", data.downloadId);
+        startProgressTracking(data.downloadId);
+      } else {
+        // Fallback to simulated progress
+        updateProgress(75, "Processing audio...");
+        setStatus("Processing audio...");
+      }
+      
       console.log("Download successful, updating progress to 100%");
       updateProgress(100, "Download complete!");
       setStatus("Download complete!");
       
-      const data = await res.json();
-      console.log("Download successful:", data);
       setStatus(`Uploaded: ${data.filename}`);
       
       // Truncate video name for display
@@ -337,6 +346,56 @@ const UploadForm = ({ onFileUploaded }) => {
     } finally {
       setIsVideoUploading(false);
     }
+  };
+
+  const startProgressTracking = (downloadId) => {
+    console.log("Starting SSE connection for progress tracking");
+    
+    const eventSource = new EventSource(`/api/youtube/progress/${downloadId}`);
+    
+    eventSource.onopen = () => {
+      console.log("SSE connection opened");
+    };
+    
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log("Progress update:", data);
+        
+        if (data.type === 'progress') {
+          const progress = data.progress || 0;
+          const downloadedBytes = data.downloadedBytes || 0;
+          const totalBytes = data.totalBytes || 0;
+          
+          // Format bytes for display
+          const formatBytes = (bytes) => {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+          };
+          
+          const downloadedFormatted = formatBytes(downloadedBytes);
+          const totalFormatted = formatBytes(totalBytes);
+          
+          updateProgress(progress, `Downloading: ${downloadedFormatted} / ${totalFormatted}`);
+          setStatus(`Downloading: ${downloadedFormatted} / ${totalFormatted}`);
+        }
+      } catch (error) {
+        console.error("Error parsing SSE data:", error);
+      }
+    };
+    
+    eventSource.onerror = (error) => {
+      console.error("SSE error:", error);
+      eventSource.close();
+    };
+    
+    // Close connection after completion
+    setTimeout(() => {
+      eventSource.close();
+    }, 30000); // Close after 30 seconds
   };
 
   const triggerFileSelect = () => {
