@@ -15,7 +15,13 @@ app.use((req, res, next) => {
   console.log("Incoming request:", req.method, req.url);
   next();
 });
-app.use("/clips", express.static(path.join(__dirname, "clips"))); // serve MP3s
+// Serve clips with proper CORS headers
+app.use("/clips", (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  next();
+}, express.static(path.join(__dirname, "clips"))); // serve MP3s
 
 // Routes
 app.get("/api/test", (req, res) => {
