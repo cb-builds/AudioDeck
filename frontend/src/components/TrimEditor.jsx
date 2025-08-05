@@ -300,27 +300,34 @@ export default function TrimEditor({ clip, originalFileName }) {
   };
 
   const zoomIn = () => {
+    console.log("zoomIn called, current zoomLevel:", zoomLevel);
     if (!wavesurferRef.current) {
+      console.log("WaveSurfer not ready for zooming");
       setStatus("WaveSurfer not ready for zooming.");
       return;
     }
 
     const newZoomLevel = Math.min(zoomLevel + 0.5, 5); // Max zoom of 5x, 0.5 increments
+    console.log("New zoom level:", newZoomLevel);
     updateZoom(newZoomLevel);
   };
 
   const zoomOut = () => {
+    console.log("zoomOut called, current zoomLevel:", zoomLevel);
     if (!wavesurferRef.current) {
+      console.log("WaveSurfer not ready for zooming");
       setStatus("WaveSurfer not ready for zooming.");
       return;
     }
 
     const newZoomLevel = Math.max(zoomLevel - 0.5, 0.5); // Min zoom of 0.5x, 0.5 increments
+    console.log("New zoom level:", newZoomLevel);
     updateZoom(newZoomLevel);
   };
 
   const handleSliderChange = (e) => {
     const newZoomLevel = parseFloat(e.target.value);
+    console.log("Slider changed to:", newZoomLevel);
     updateZoom(newZoomLevel);
   };
 
@@ -978,10 +985,12 @@ export default function TrimEditor({ clip, originalFileName }) {
                 step="0.1"
                 value={zoomLevel}
                 onChange={handleSliderChange}
-                className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                className="w-full h-2 rounded-lg appearance-none cursor-pointer zoom-slider"
                 style={{
                   background: 'linear-gradient(to right, #A44EFF, #427BFF)',
-                  outline: 'none'
+                  outline: 'none',
+                  WebkitAppearance: 'none',
+                  MozAppearance: 'none'
                 }}
                 disabled={!isReady}
               />
