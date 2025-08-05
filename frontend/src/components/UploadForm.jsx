@@ -313,14 +313,14 @@ const UploadForm = ({ onFileUploaded }) => {
       console.log("Download started:", data);
       
       // Start listening for progress updates if we have a downloadId
-      if (data.downloadId) {
-        console.log("Starting progress tracking for downloadId:", data.downloadId);
-        startProgressTracking(data.downloadId, currentVideoName);
-      } else {
-        // Fallback to simulated progress
-        updateProgress(75, "Processing audio...");
-        setStatus("Processing audio...");
-      }
+              if (data.downloadId) {
+          console.log("Starting progress tracking for downloadId:", data.downloadId);
+          startProgressTracking(data.downloadId, videoName);
+        } else {
+          // Fallback to simulated progress
+          updateProgress(75, "Processing audio...");
+          setStatus("Processing audio...");
+        }
       
       // Truncate video name for display
       const truncatedVideoName = truncateText(videoName, 50);
@@ -351,6 +351,7 @@ const UploadForm = ({ onFileUploaded }) => {
     // Store the downloadId and video name for use in completion
     let currentDownloadId = downloadId;
     let currentVideoName = videoName;
+    let completionHandled = false; // Flag to prevent multiple completion calls
     
     eventSource.onmessage = (event) => {
       try {
@@ -388,12 +389,12 @@ const UploadForm = ({ onFileUploaded }) => {
           setStatus(`Downloading: ${downloadedFormatted} / ${totalFormatted}`);
           
           // If progress is 100% or status is complete, handle completion
-          if (progress >= 100 || status === 'complete') {
+          if ((progress >= 100 || status === 'complete') && !completionHandled) {
+            completionHandled = true; // Mark as handled to prevent duplicate calls
+            
             // Extract filename from downloadId (assuming format: downloadId_imported_video.mp3)
             const filename = `${currentDownloadId}_imported_video.mp3`;
             const truncatedVideoName = truncateText(currentVideoName, 50);
-            
-
             
             // Notify parent component about the uploaded file
             if (onFileUploaded) {
