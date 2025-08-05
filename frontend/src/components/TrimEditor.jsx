@@ -54,11 +54,14 @@ export default function TrimEditor({ clip, originalFileName }) {
       waveColor: "#A44EFF", // Design system primary color - keep purple
       progressColor: "#70FFEA", // Design system selected color - blue progress
       height: 150, // Increased height
-      url: `/clips/${clip}`, // Use relative path that works with Vite proxy
+      url: `http://localhost:4000/clips/${clip}`, // Use full backend URL to avoid proxy issues
       interact: false, // Disable default interactions
       plugins: [regionsPlugin],
       autoScroll: false, // Disable auto-scroll
       scrollParent: false, // Disable scroll parent
+      backend: 'WebAudio', // Use WebAudio backend for better compatibility
+      mediaControls: false, // Disable media controls
+      responsive: true, // Make it responsive
     });
 
     // Create separate audio element for playback
@@ -112,6 +115,10 @@ export default function TrimEditor({ clip, originalFileName }) {
     wavesurfer.on("load-error", (error) => {
       console.error("WaveSurfer load error:", error);
       setStatus("Failed to load audio file: " + error.message);
+      
+      // Try alternative URL if the first one fails
+      console.log("Trying alternative URL...");
+      wavesurfer.load(`/clips/${clip}`);
     });
 
     // Listen for all possible region events
