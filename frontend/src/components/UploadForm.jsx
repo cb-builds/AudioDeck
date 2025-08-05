@@ -388,10 +388,10 @@ const UploadForm = ({ onFileUploaded }) => {
               <div 
                 className="w-10 h-10 rounded-full flex items-center justify-center mr-3"
                 style={{
-                  background: 'linear-gradient(135deg, #FF6B6B, #FF8E53)'
+                  background: 'linear-gradient(135deg, #A44EFF, #427BFF)'
                 }}
               >
-                <span className="text-white text-lg">⚡</span>
+                <span className="text-white text-lg">📊</span>
               </div>
               <h3 className="text-lg font-semibold text-white">Progress</h3>
             </div>
@@ -407,7 +407,7 @@ const UploadForm = ({ onFileUploaded }) => {
                   className="h-3 rounded-full transition-all duration-300 ease-out"
                   style={{
                     width: `${progressValue}%`,
-                    background: 'linear-gradient(90deg, #FF6B6B, #FF8E53)'
+                    background: 'linear-gradient(to right, #A44EFF, #427BFF)'
                   }}
                 ></div>
               </div>
