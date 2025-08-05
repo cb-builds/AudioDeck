@@ -9,11 +9,33 @@ const UploadForm = ({ onFileUploaded }) => {
   const [showPopup, setShowPopup] = useState(false);
   const [popupMessage, setPopupMessage] = useState("");
   const [popupTitle, setPopupTitle] = useState("");
+  
+  // Progress bar state
+  const [showProgress, setShowProgress] = useState(false);
+  const [progressValue, setProgressValue] = useState(0);
+  const [progressText, setProgressText] = useState("");
 
   const showErrorPopup = (title, message) => {
     setPopupTitle(title);
     setPopupMessage(message);
     setShowPopup(true);
+  };
+
+  const startProgress = (text) => {
+    setShowProgress(true);
+    setProgressValue(0);
+    setProgressText(text);
+  };
+
+  const updateProgress = (value, text) => {
+    setProgressValue(value);
+    if (text) setProgressText(text);
+  };
+
+  const hideProgress = () => {
+    setShowProgress(false);
+    setProgressValue(0);
+    setProgressText("");
   };
 
   const handleFileChange = (e) => {
@@ -39,14 +61,28 @@ const UploadForm = ({ onFileUploaded }) => {
 
   const handleFileUpload = async (fileToUpload = file) => {
     if (!fileToUpload) return setStatus("No file selected.");
+    
+    startProgress("Uploading file...");
+    
     const formData = new FormData();
     formData.append("audio", fileToUpload);
 
     try {
+      // Simulate progress for better UX
+      const progressInterval = setInterval(() => {
+        setProgressValue(prev => {
+          if (prev < 90) return prev + Math.random() * 10;
+          return prev;
+        });
+      }, 200);
+
       const res = await fetch("/api/upload", {
         method: "POST",
         body: formData,
       });
+
+      clearInterval(progressInterval);
+      updateProgress(100, "Upload complete!");
 
       const data = await res.json();
       setStatus(`Uploaded as: ${data.filename}`);
@@ -55,7 +91,14 @@ const UploadForm = ({ onFileUploaded }) => {
       if (onFileUploaded) {
         onFileUploaded(data.filename, fileToUpload.name); // Pass both server filename and original filename
       }
+      
+      // Hide progress after a delay
+      setTimeout(() => {
+        hideProgress();
+      }, 2000);
+      
     } catch (err) {
+      hideProgress();
       setStatus("Upload failed.");
     }
   };
@@ -64,6 +107,7 @@ const UploadForm = ({ onFileUploaded }) => {
     if (!ytUrl) return setStatus("Please enter a video URL.");
     
     setIsVideoUploading(true);
+    startProgress("Checking video duration...");
     setStatus("Checking video duration...");
     
     try {
@@ -84,6 +128,7 @@ const UploadForm = ({ onFileUploaded }) => {
             const durationFormatted = `${minutes}:${seconds.toString().padStart(2, '0')}`;
             
             console.log("Video too long, showing popup and stopping download");
+            hideProgress();
             showErrorPopup(
               "❌ Video Too Long",
               `This video is too long to download.\n\nDuration: ${durationFormatted}\nMaximum allowed: 20:00\n\nPlease try a shorter video or clip.`
@@ -98,199 +143,41 @@ const UploadForm = ({ onFileUploaded }) => {
           console.log("Could not check duration, proceeding with download");
         }
       } catch (durationError) {
-        console.log("Duration check failed:", durationError);
-        console.log("Proceeding with download anyway");
+        console.log("Duration check failed, proceeding with download:", durationError);
       }
       
-      setStatus("Getting video title...");
+      updateProgress(25, "Downloading video...");
+      setStatus("Downloading video...");
       
-      // First, try to get the video title using the new endpoint
-      let videoName = "Imported Video";
-      
-      try {
-        console.log("Attempting to get video title...");
-        const titleRes = await fetch(`/api/youtube/title?url=${encodeURIComponent(ytUrl)}`);
-        
-        if (titleRes.ok) {
-          const titleData = await titleRes.json();
-          videoName = titleData.title || "Imported Video";
-          console.log("Got video title:", videoName);
-        } else {
-          console.log("Could not get video title, using fallback");
-          // Fallback to platform-specific naming
-          if (ytUrl.includes('youtube.com/') || ytUrl.includes('youtu.be/')) {
-            const videoId = ytUrl.includes('v=') ? ytUrl.split('v=')[1]?.split('&')[0] : 
-                           ytUrl.includes('youtu.be/') ? ytUrl.split('youtu.be/')[1]?.split('?')[0] : '';
-            videoName = videoId ? `YouTube Video (${videoId})` : "YouTube Video";
-          } else if (ytUrl.includes('tiktok.com/')) {
-            const tiktokMatch = ytUrl.match(/tiktok\.com\/@[^\/]+\/video\/(\d+)/);
-            if (tiktokMatch) {
-              videoName = `TikTok Video (${tiktokMatch[1]})`;
-            } else {
-              videoName = "TikTok Video";
-            }
-          } else if (ytUrl.includes('twitch.tv/')) {
-            // Extract Twitch streamer name, video ID, or clip ID
-            if (ytUrl.includes('/clip/')) {
-              // Handle Twitch clips
-              const clipMatch = ytUrl.match(/twitch\.tv\/([^\/]+)\/clip\/([^\/\?]+)/);
-              if (clipMatch) {
-                const streamer = clipMatch[1];
-                const clipId = clipMatch[2];
-                videoName = `Twitch Clip (${streamer} - ${clipId})`;
-              } else {
-                videoName = "Twitch Clip";
-              }
-            } else {
-              // Handle Twitch streams and VODs
-              const twitchMatch = ytUrl.match(/twitch\.tv\/([^\/]+)(?:\/v\/(\d+))?/);
-              if (twitchMatch) {
-                const streamer = twitchMatch[1];
-                const videoId = twitchMatch[2];
-                if (videoId) {
-                  videoName = `Twitch VOD (${streamer} - ${videoId})`;
-                } else {
-                  videoName = `Twitch Stream (${streamer})`;
-                }
-              } else {
-                videoName = "Twitch Video";
-              }
-            }
-          }
-        }
-      } catch (titleError) {
-        console.log("Title extraction failed, using fallback:", titleError);
-        // Same fallback logic as above
-        if (ytUrl.includes('youtube.com/') || ytUrl.includes('youtu.be/')) {
-          const videoId = ytUrl.includes('v=') ? ytUrl.split('v=')[1]?.split('&')[0] : 
-                         ytUrl.includes('youtu.be/') ? ytUrl.split('youtu.be/')[1]?.split('?')[0] : '';
-          videoName = videoId ? `YouTube Video (${videoId})` : "YouTube Video";
-        } else if (ytUrl.includes('tiktok.com/')) {
-          const tiktokMatch = ytUrl.match(/tiktok\.com\/@[^\/]+\/video\/(\d+)/);
-          if (tiktokMatch) {
-            videoName = `TikTok Video (${tiktokMatch[1]})`;
-          } else {
-            videoName = "TikTok Video";
-          }
-        } else if (ytUrl.includes('twitch.tv/')) {
-          // Extract Twitch streamer name, video ID, or clip ID
-          if (ytUrl.includes('/clip/')) {
-            // Handle Twitch clips
-            const clipMatch = ytUrl.match(/twitch\.tv\/([^\/]+)\/clip\/([^\/\?]+)/);
-            if (clipMatch) {
-              const streamer = clipMatch[1];
-              const clipId = clipMatch[2];
-              videoName = `Twitch Clip (${streamer} - ${clipId})`;
-            } else {
-              videoName = "Twitch Clip";
-            }
-          } else {
-            // Handle Twitch streams and VODs
-            const twitchMatch = ytUrl.match(/twitch\.tv\/([^\/]+)(?:\/v\/(\d+))?/);
-            if (twitchMatch) {
-              const streamer = twitchMatch[1];
-              const videoId = twitchMatch[2];
-              if (videoId) {
-                videoName = `Twitch VOD (${streamer} - ${videoId})`;
-              } else {
-                videoName = `Twitch Stream (${streamer})`;
-              }
-            } else {
-              videoName = "Twitch Video";
-            }
-          }
-        }
-      }
-      
-      // Extract video ID for filename generation
-      let videoId = "";
-      
-      // Try different URL formats
-      if (ytUrl.includes('youtube.com/watch?v=')) {
-        videoId = ytUrl.split('v=')[1]?.split('&')[0];
-      } else if (ytUrl.includes('youtu.be/')) {
-        videoId = ytUrl.split('youtu.be/')[1]?.split('?')[0];
-      } else if (ytUrl.includes('youtube.com/embed/')) {
-        videoId = ytUrl.split('embed/')[1]?.split('?')[0];
-      } else if (ytUrl.includes('tiktok.com/')) {
-        // Extract TikTok video ID
-        const tiktokMatch = ytUrl.match(/tiktok\.com\/@[^\/]+\/video\/(\d+)/);
-        if (tiktokMatch) {
-          videoId = tiktokMatch[1];
-        }
-      } else if (ytUrl.includes('twitch.tv/')) {
-        // Extract Twitch video ID, clip ID, or streamer name
-        if (ytUrl.includes('/clip/')) {
-          // Extract clip ID
-          const clipMatch = ytUrl.match(/twitch\.tv\/[^\/]+\/clip\/([^\/\?]+)/);
-          if (clipMatch) {
-            videoId = clipMatch[1];
-          }
-        } else {
-          // Extract VOD ID or streamer name
-          const twitchMatch = ytUrl.match(/twitch\.tv\/[^\/]+\/v\/(\d+)/);
-          if (twitchMatch) {
-            videoId = twitchMatch[1];
-          } else {
-            // For live streams, use streamer name as ID
-            const streamerMatch = ytUrl.match(/twitch\.tv\/([^\/]+)/);
-            if (streamerMatch) {
-              videoId = streamerMatch[1];
-            }
-          }
-        }
-      }
-      
-      const generatedName = `imported_${videoId || 'video'}`;
-      console.log("Generated filename:", generatedName);
-      
-      console.log("Sending download request to backend...");
-              const res = await fetch("/api/youtube", {
+      const res = await fetch("/api/youtube", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: ytUrl, name: generatedName }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url: ytUrl }),
       });
       
-      console.log("Backend response status:", res.status);
+      updateProgress(75, "Processing audio...");
+      setStatus("Processing audio...");
       
       if (!res.ok) {
         const errorData = await res.json();
-        console.error("Backend error:", errorData);
+        console.error("Video upload error response:", errorData);
         
-        // Handle TikTok-specific errors
+        hideProgress();
+        
         if (errorData.error === "TikTok access blocked") {
           showErrorPopup(
             "❌ TikTok Access Blocked",
-            "TikTok has blocked access from this IP address.\n\nPlease try again later or use a different network."
+            "TikTok has blocked access to this video.\n\nThis is a common issue with TikTok videos.\nPlease try a different video or platform."
           );
-          throw new Error("TikTok has blocked access from this IP. Please try again later or use a different network.");
-        }
-        
-        // Handle file size errors
-        if (errorData.error === "File too large") {
-          showErrorPopup(
-            "❌ Video Too Large",
-            "The video you're trying to download is too long.\n\nMaximum allowed: 25MB\n\nPlease try a shorter video or clip."
-          );
-          throw new Error("The video is too long. Please try a shorter video or clip (under 25MB).");
-        }
-        
-        // Handle duration errors
-        if (errorData.error === "Video too long") {
-          showErrorPopup(
-            "❌ Video Too Long",
-            "This video exceeds the 20-minute duration limit.\n\nPlease try a shorter video or clip."
-          );
-          throw new Error("Video too long. Please try a shorter video (under 20 minutes).");
-        }
-        
-        // Handle Twitch-specific errors
-        if (errorData.error === "Twitch stream offline") {
+          throw new Error("TikTok access blocked. Please try a different video.");
+        } else if (errorData.error === "Twitch stream offline") {
           showErrorPopup(
             "❌ Twitch Stream Offline",
-            "This Twitch streamer is not currently live.\n\nPlease try with a live stream or use a VOD URL instead."
+            "This Twitch stream is currently offline.\n\nPlease check if the streamer is live or try a different stream."
           );
-          throw new Error("Twitch stream offline. Please try with a live stream or use a VOD URL instead.");
+          throw new Error("Twitch stream is offline. Please check if the streamer is live.");
         } else if (errorData.error === "Twitch VOD not found") {
           showErrorPopup(
             "❌ Twitch VOD Not Found",
@@ -308,19 +195,26 @@ const UploadForm = ({ onFileUploaded }) => {
         throw new Error(errorData.error || 'Video upload failed');
       }
       
+      updateProgress(100, "Download complete!");
+      setStatus("Download complete!");
+      
       const data = await res.json();
       console.log("Download successful:", data);
       setStatus(`Uploaded: ${data.filename}`);
       
-      // Truncate video name for display
-      const truncatedVideoName = truncateText(videoName, 50);
-      
       // Notify parent component about the uploaded file
       if (onFileUploaded) {
-        onFileUploaded(data.filename, truncatedVideoName);
+        onFileUploaded(data.filename, "Imported Video");
       }
+      
+      // Hide progress after a delay
+      setTimeout(() => {
+        hideProgress();
+      }, 2000);
+      
     } catch (err) {
       console.error("Video upload error:", err);
+      hideProgress();
       setStatus(`Video upload failed: ${err.message}`);
     } finally {
       setIsVideoUploading(false);
@@ -460,6 +354,49 @@ const UploadForm = ({ onFileUploaded }) => {
           </button>
         </div>
       </div>
+
+      {/* Progress Bar Section */}
+      {showProgress && (
+        <div className="col-span-full mt-6">
+          <div 
+            className="p-6 rounded-2xl"
+            style={{
+              background: '#14162B',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+              border: '1px solid rgba(167, 139, 250, 0.1)'
+            }}
+          >
+            <div className="flex items-center mb-4">
+              <div 
+                className="w-10 h-10 rounded-full flex items-center justify-center mr-3"
+                style={{
+                  background: 'linear-gradient(135deg, #FF6B6B, #FF8E53)'
+                }}
+              >
+                <span className="text-white text-lg">⚡</span>
+              </div>
+              <h3 className="text-lg font-semibold text-white">Progress</h3>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-300">{progressText}</span>
+                <span className="text-sm text-gray-400">{progressValue}%</span>
+              </div>
+              
+              <div className="w-full bg-gray-700 rounded-full h-3">
+                <div 
+                  className="h-3 rounded-full transition-all duration-300 ease-out"
+                  style={{
+                    width: `${progressValue}%`,
+                    background: 'linear-gradient(90deg, #FF6B6B, #FF8E53)'
+                  }}
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Custom Error Popup Modal */}
       {showPopup && (
