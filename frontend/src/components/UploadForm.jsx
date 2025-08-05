@@ -159,6 +159,103 @@ const UploadForm = ({ onFileUploaded }) => {
       updateProgress(25, "Downloading video...");
       setStatus("Downloading video...");
       
+      // Get video title before downloading
+      let videoName = "Imported Video";
+      try {
+        console.log("Getting video title...");
+        const titleRes = await fetch(`/api/youtube/title?url=${encodeURIComponent(ytUrl)}`);
+        
+        if (titleRes.ok) {
+          const titleData = await titleRes.json();
+          videoName = titleData.title || "Imported Video";
+          console.log("Got video title:", videoName);
+        } else {
+          console.log("Could not get video title, using fallback");
+          // Fallback to platform-specific naming
+          if (ytUrl.includes('youtube.com/') || ytUrl.includes('youtu.be/')) {
+            const videoId = ytUrl.includes('v=') ? ytUrl.split('v=')[1]?.split('&')[0] : 
+                           ytUrl.includes('youtu.be/') ? ytUrl.split('youtu.be/')[1]?.split('?')[0] : '';
+            videoName = videoId ? `YouTube Video (${videoId})` : "YouTube Video";
+          } else if (ytUrl.includes('tiktok.com/')) {
+            const tiktokMatch = ytUrl.match(/tiktok\.com\/@[^\/]+\/video\/(\d+)/);
+            if (tiktokMatch) {
+              videoName = `TikTok Video (${tiktokMatch[1]})`;
+            } else {
+              videoName = "TikTok Video";
+            }
+          } else if (ytUrl.includes('twitch.tv/')) {
+            // Extract Twitch streamer name, video ID, or clip ID
+            if (ytUrl.includes('/clip/')) {
+              // Handle Twitch clips
+              const clipMatch = ytUrl.match(/twitch\.tv\/([^\/]+)\/clip\/([^\/\?]+)/);
+              if (clipMatch) {
+                const streamer = clipMatch[1];
+                const clipId = clipMatch[2];
+                videoName = `Twitch Clip (${streamer} - ${clipId})`;
+              } else {
+                videoName = "Twitch Clip";
+              }
+            } else {
+              // Handle Twitch streams and VODs
+              const twitchMatch = ytUrl.match(/twitch\.tv\/([^\/]+)(?:\/v\/(\d+))?/);
+              if (twitchMatch) {
+                const streamer = twitchMatch[1];
+                const videoId = twitchMatch[2];
+                if (videoId) {
+                  videoName = `Twitch VOD (${streamer} - ${videoId})`;
+                } else {
+                  videoName = `Twitch Stream (${streamer})`;
+                }
+              } else {
+                videoName = "Twitch Video";
+              }
+            }
+          }
+        }
+      } catch (titleError) {
+        console.log("Title extraction failed, using fallback:", titleError);
+        // Same fallback logic as above
+        if (ytUrl.includes('youtube.com/') || ytUrl.includes('youtu.be/')) {
+          const videoId = ytUrl.includes('v=') ? ytUrl.split('v=')[1]?.split('&')[0] : 
+                         ytUrl.includes('youtu.be/') ? ytUrl.split('youtu.be/')[1]?.split('?')[0] : '';
+          videoName = videoId ? `YouTube Video (${videoId})` : "YouTube Video";
+        } else if (ytUrl.includes('tiktok.com/')) {
+          const tiktokMatch = ytUrl.match(/tiktok\.com\/@[^\/]+\/video\/(\d+)/);
+          if (tiktokMatch) {
+            videoName = `TikTok Video (${tiktokMatch[1]})`;
+          } else {
+            videoName = "TikTok Video";
+          }
+        } else if (ytUrl.includes('twitch.tv/')) {
+          // Extract Twitch streamer name, video ID, or clip ID
+          if (ytUrl.includes('/clip/')) {
+            // Handle Twitch clips
+            const clipMatch = ytUrl.match(/twitch\.tv\/([^\/]+)\/clip\/([^\/\?]+)/);
+            if (clipMatch) {
+              const streamer = clipMatch[1];
+              const clipId = clipMatch[2];
+              videoName = `Twitch Clip (${streamer} - ${clipId})`;
+            } else {
+              videoName = "Twitch Clip";
+            }
+          } else {
+            // Handle Twitch streams and VODs
+            const twitchMatch = ytUrl.match(/twitch\.tv\/([^\/]+)(?:\/v\/(\d+))?/);
+            if (twitchMatch) {
+              const streamer = twitchMatch[1];
+              const videoId = twitchMatch[2];
+              if (videoId) {
+                videoName = `Twitch VOD (${streamer} - ${videoId})`;
+              } else {
+                videoName = `Twitch Stream (${streamer})`;
+              }
+            } else {
+              videoName = "Twitch Video";
+            }
+          }
+        }
+      }
+      
       console.log("Making download request to /api/youtube");
       const res = await fetch("/api/youtube", {
         method: "POST",
@@ -218,9 +315,12 @@ const UploadForm = ({ onFileUploaded }) => {
       console.log("Download successful:", data);
       setStatus(`Uploaded: ${data.filename}`);
       
+      // Truncate video name for display
+      const truncatedVideoName = truncateText(videoName, 50);
+      
       // Notify parent component about the uploaded file
       if (onFileUploaded) {
-        onFileUploaded(data.filename, "Imported Video");
+        onFileUploaded(data.filename, truncatedVideoName);
       }
       
       // Hide progress after a delay
