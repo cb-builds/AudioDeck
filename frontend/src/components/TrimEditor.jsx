@@ -72,7 +72,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
               console.log(`File exists, checking for stability. Size: ${contentLength} bytes`);
               setTimeout(checkDownloadComplete, 2000);
               return;
-            } else if (retryCount < 5) {
+            } else if (retryCount < 20) {
               // Check if file size has changed
               const currentSize = parseInt(contentLength);
               const lastSize = window.lastFileSize || 0;
@@ -85,9 +85,9 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
                 return;
               } else {
                 // File size is still changing, wait more
-                console.log(`File size changing: ${lastSize} → ${currentSize} bytes, retry ${retryCount}/5`);
+                console.log(`File size changing: ${lastSize} → ${currentSize} bytes, retry ${retryCount}/20`);
                 window.lastFileSize = currentSize;
-                setTimeout(checkDownloadComplete, 2000);
+                setTimeout(checkDownloadComplete, 1000);
                 return;
               }
             } else {
