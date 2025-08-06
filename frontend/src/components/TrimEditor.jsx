@@ -54,7 +54,7 @@ export default function TrimEditor({ clip, originalFileName }) {
       waveColor: "#A44EFF", // Design system primary color - keep purple
       progressColor: "#70FFEA", // Design system selected color - blue progress
       height: 150, // Increased height
-      url: `http://localhost:4000/clips/${clip}`, // Use full backend URL to avoid proxy issues
+      url: `/clips/${clip}`, // Use relative URL to work on any server
       interact: false, // Disable default interactions
       plugins: [regionsPlugin],
       autoScroll: false, // Disable auto-scroll
@@ -119,22 +119,32 @@ export default function TrimEditor({ clip, originalFileName }) {
       
       // Try alternative URL if the first one fails
       console.log("Trying alternative URL...");
-      wavesurfer.load(`/clips/${clip}`);
+      wavesurfer.load(`/api/audio/${clip}`);
     });
 
     // Add a fallback mechanism for different backends
+    let retryCount = 0;
+    const maxRetries = 2;
+    
     wavesurfer.on("error", (error) => {
       console.error("WaveSurfer error:", error);
       console.error("Error details:", {
         code: error.code,
         message: error.message,
         clip: clip,
-        url: `/clips/${clip}`
+        url: retryCount === 0 ? `/clips/${clip}` : `/api/audio/${clip}`
       });
       
-      // If MediaElement backend fails, try WebAudio backend
-      if (wavesurfer.backend && wavesurfer.backend.name === 'MediaElement') {
-        console.log("MediaElement backend failed, trying WebAudio backend...");
+      if (retryCount < maxRetries) {
+        retryCount++;
+        console.log(`Retry ${retryCount}/${maxRetries}: Trying alternative endpoint...`);
+        
+        // Try alternative endpoint
+        const alternativeUrl = retryCount === 1 ? `/api/audio/${clip}` : `/clips/${clip}`;
+        wavesurfer.load(alternativeUrl);
+      } else {
+        // If all retries failed, try WebAudio backend as last resort
+        console.log("All endpoints failed, trying WebAudio backend...");
         setStatus("Trying alternative audio backend...");
         
         // Destroy current instance and recreate with WebAudio backend
@@ -145,7 +155,7 @@ export default function TrimEditor({ clip, originalFileName }) {
           waveColor: "#A44EFF",
           progressColor: "#70FFEA",
           height: 150,
-          url: `http://localhost:4000/clips/${clip}`,
+          url: `/clips/${clip}`,
           interact: false,
           plugins: [regionsPlugin],
           autoScroll: false,
@@ -154,7 +164,6 @@ export default function TrimEditor({ clip, originalFileName }) {
           mediaControls: false,
           responsive: true,
           normalize: true,
-          hideScrollbar: true,
         });
         
         // Set up the same event handlers for the fallback
@@ -188,8 +197,6 @@ export default function TrimEditor({ clip, originalFileName }) {
           console.error("Fallback WaveSurfer also failed:", fallbackError);
           setStatus("Failed to load audio file with both backends");
         });
-      } else {
-        setStatus("WaveSurfer error: " + error.message);
       }
     });
 
