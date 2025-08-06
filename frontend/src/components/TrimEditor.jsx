@@ -63,7 +63,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
         const response = await fetch(`/clips/${clip}`, { method: 'HEAD' });
         if (response.ok) {
           const contentLength = response.headers.get('content-length');
-          if (contentLength && parseInt(contentLength) > 1000000) { // At least 1MB
+          if (contentLength && parseInt(contentLength) > 10000) { // At least 10KB - much more reasonable for short clips
             // Additional check: wait a bit longer for file processing
             if (retryCount < 10) {
               console.log(`File exists but waiting for processing, retry ${retryCount}/${maxRetries}`);
