@@ -65,15 +65,37 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
           const contentLength = response.headers.get('content-length');
           console.log(`File size check: ${contentLength} bytes for ${clip}`);
           if (contentLength && parseInt(contentLength) > 10000) { // At least 10KB - much more reasonable for short clips
-            // For files that are already large enough, wait longer for processing to complete
-            if (retryCount < 15) { // Increased retries for large files
-              console.log(`File exists but waiting for processing, retry ${retryCount}/${maxRetries}`);
-              setTimeout(checkDownloadComplete, 2000); // Increased delay to 2 seconds
+            // Check if file size is stable (not still growing)
+            if (retryCount === 0) {
+              // First check - store the size and wait
+              window.lastFileSize = parseInt(contentLength);
+              console.log(`File exists, checking for stability. Size: ${contentLength} bytes`);
+              setTimeout(checkDownloadComplete, 2000);
               return;
+            } else if (retryCount < 5) {
+              // Check if file size has changed
+              const currentSize = parseInt(contentLength);
+              const lastSize = window.lastFileSize || 0;
+              
+              if (currentSize === lastSize) {
+                // File size is stable, it's ready
+                console.log(`File size stable at ${currentSize} bytes, attempting to load WaveSurfer`);
+                setStatus("Initializing audio waveform...");
+                initializeWaveSurfer();
+                return;
+              } else {
+                // File size is still changing, wait more
+                console.log(`File size changing: ${lastSize} → ${currentSize} bytes, retry ${retryCount}/5`);
+                window.lastFileSize = currentSize;
+                setTimeout(checkDownloadComplete, 2000);
+                return;
+              }
+            } else {
+              // Max retries reached, load anyway
+              console.log("Max retries reached, attempting to load WaveSurfer");
+              setStatus("Initializing audio waveform...");
+              initializeWaveSurfer();
             }
-            console.log("File appears to be complete, attempting to load WaveSurfer");
-            setStatus("Initializing audio waveform...");
-            initializeWaveSurfer();
           } else {
             console.log(`File too small (${contentLength} bytes), retry ${retryCount}/${maxRetries}`);
             setTimeout(checkDownloadComplete, 1000);
