@@ -63,6 +63,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
         const response = await fetch(`/clips/${clip}`, { method: 'HEAD' });
         if (response.ok) {
           const contentLength = response.headers.get('content-length');
+          console.log(`File size check: ${contentLength} bytes for ${clip}`);
           if (contentLength && parseInt(contentLength) > 10000) { // At least 10KB - much more reasonable for short clips
             // For files that are already large enough, only wait a short time for processing
             if (retryCount < 3) { // Reduced from 10 to 3 retries for large files
@@ -125,10 +126,17 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
       plugins: [regionsPlugin],
       autoScroll: false, // Disable auto-scroll
       scrollParent: false, // Disable scroll parent
-      backend: 'MediaElement', // Try MediaElement backend first for better compatibility
+      backend: 'WebAudio', // Use WebAudio backend for better file reading
       mediaControls: false, // Disable media controls
       responsive: true, // Make it responsive
       normalize: true, // Normalize audio for better visualization
+      // Add debugging for file loading
+      onloaderror: (error) => {
+        console.error("WaveSurfer load error:", error);
+      },
+      onload: () => {
+        console.log("WaveSurfer file loaded successfully");
+      }
     });
 
     // Create separate audio element for playback
