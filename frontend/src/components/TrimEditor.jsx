@@ -65,10 +65,10 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
           const contentLength = response.headers.get('content-length');
           console.log(`File size check: ${contentLength} bytes for ${clip}`);
           if (contentLength && parseInt(contentLength) > 10000) { // At least 10KB - much more reasonable for short clips
-            // For files that are already large enough, only wait a short time for processing
-            if (retryCount < 3) { // Reduced from 10 to 3 retries for large files
+            // For files that are already large enough, wait longer for processing to complete
+            if (retryCount < 15) { // Increased retries for large files
               console.log(`File exists but waiting for processing, retry ${retryCount}/${maxRetries}`);
-              setTimeout(checkDownloadComplete, 1000); // Reduced from 2000 to 1000ms
+              setTimeout(checkDownloadComplete, 2000); // Increased delay to 2 seconds
               return;
             }
             console.log("File appears to be complete, attempting to load WaveSurfer");
