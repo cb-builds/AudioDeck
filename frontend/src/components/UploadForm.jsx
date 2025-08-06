@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { truncateText } from "../utils/textUtils";
 
-const UploadForm = ({ onFileUploaded }) => {
+const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
   const [file, setFile] = useState(null);
   const [ytUrl, setYtUrl] = useState("");
   const [status, setStatus] = useState("");
@@ -41,6 +41,9 @@ const UploadForm = ({ onFileUploaded }) => {
     setShowProgress(false);
     setProgressValue(0);
     setProgressText("");
+    if (onDownloadComplete) {
+      onDownloadComplete();
+    }
   };
 
   const handleFileChange = (e) => {

@@ -38,7 +38,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
 
     console.log("Setting up WaveSurfer for clip:", clip);
     console.log("Expected duration:", expectedDuration);
-    setStatus("Waiting for download to complete...");
+    setStatus("Processing audio waveform...");
 
     // Reset state for new clip
     setIsInitializing(false);

@@ -6,6 +6,7 @@ function App() {
   const [uploadedFile, setUploadedFile] = useState(null);
   const [originalFileName, setOriginalFileName] = useState("");
   const [videoDuration, setVideoDuration] = useState(0);
+  const [downloadComplete, setDownloadComplete] = useState(false);
 
   // Initialize Ko-fi widget
   useEffect(() => {
@@ -59,6 +60,11 @@ function App() {
     setUploadedFile(filename);
     setOriginalFileName(originalName);
     setVideoDuration(duration);
+    setDownloadComplete(false); // Reset download complete state
+  };
+
+  const handleDownloadComplete = () => {
+    setDownloadComplete(true);
   };
 
   return (
@@ -100,9 +106,9 @@ function App() {
 
         {/* Main Content */}
         <div className="space-y-8">
-          <UploadForm onFileUploaded={handleFileUploaded} />
+          <UploadForm onFileUploaded={handleFileUploaded} onDownloadComplete={handleDownloadComplete} />
           
-          {uploadedFile && (
+          {uploadedFile && downloadComplete && (
             <TrimEditor clip={uploadedFile} originalFileName={originalFileName} expectedDuration={videoDuration} />
           )}
         </div>
