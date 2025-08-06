@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     container_name: audiodeck-app-dev
     ports:
-      - "4000:4000"
+      - "4040:4000"
     volumes:
       - audiodeck_clips:/app/backend/clips
       - audiodeck_logs:/app/logs
