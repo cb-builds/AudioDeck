@@ -5,6 +5,7 @@ import TrimEditor from "./components/TrimEditor";
 function App() {
   const [uploadedFile, setUploadedFile] = useState(null);
   const [originalFileName, setOriginalFileName] = useState("");
+  const [videoDuration, setVideoDuration] = useState(0);
 
   // Initialize Ko-fi widget
   useEffect(() => {
@@ -54,9 +55,10 @@ function App() {
     };
   }, []);
 
-  const handleFileUploaded = (filename, originalName) => {
+  const handleFileUploaded = (filename, originalName, duration = 0) => {
     setUploadedFile(filename);
     setOriginalFileName(originalName);
+    setVideoDuration(duration);
   };
 
   return (
@@ -101,7 +103,7 @@ function App() {
           <UploadForm onFileUploaded={handleFileUploaded} />
           
           {uploadedFile && (
-            <TrimEditor clip={uploadedFile} originalFileName={originalFileName} />
+            <TrimEditor clip={uploadedFile} originalFileName={originalFileName} expectedDuration={videoDuration} />
           )}
         </div>
       </div>

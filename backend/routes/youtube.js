@@ -33,7 +33,8 @@ router.get("/progress/:downloadId", (req, res) => {
       downloadedBytes: download.downloadedBytes,
       totalBytes: download.totalBytes,
       status: download.status,
-      error: download.error
+      error: download.error,
+      videoDuration: download.videoDuration // Include video duration in initial progress
     })}\n\n`);
   }
 
@@ -47,7 +48,8 @@ router.get("/progress/:downloadId", (req, res) => {
         downloadedBytes: download.downloadedBytes,
         totalBytes: download.totalBytes,
         status: download.status,
-        error: download.error
+        error: download.error,
+        videoDuration: download.videoDuration // Include video duration in interval updates
       })}\n\n`);
     }
   }, 1000);
@@ -238,6 +240,8 @@ router.get("/title", async (req, res) => {
 router.post("/", (req, res) => {
   const { url, name } = req.body;
 
+  console.log("POST /api/youtube called with:", { url, name });
+
   if (!url || !name) {
     return res.status(400).json({ error: "Missing video URL or desired name." });
   }
@@ -245,170 +249,212 @@ router.post("/", (req, res) => {
   const downloadId = Date.now().toString();
   const outputPath = path.join(CLIPS_DIR, `${downloadId}_${name}.mp3`);
 
+  console.log("Created downloadId:", downloadId);
+  console.log("Output path:", outputPath);
+
   // Initialize download tracking
   activeDownloads.set(downloadId, {
     progress: 0,
     downloadedBytes: 0,
     totalBytes: 0,
-    status: 'downloading'
+    status: 'downloading',
+    videoDuration: 0 // Store video duration
   });
 
-  // Enhanced yt-dlp command with progress tracking - direct MP3 extraction
-  let ytCmd;
-  if (url.includes('tiktok.com')) {
-    // Special handling for TikTok with more flexible format selection
-    ytCmd = `yt-dlp -f "best[height<=720]/best" --extract-audio --audio-format mp3 --no-playlist --no-warnings --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" -o "${outputPath}" --progress-template "%(progress.downloaded_bytes)s/%(progress.total_bytes)s" "${url}"`;
-  } else if (url.includes('twitch.tv')) {
-    // Special handling for Twitch with enhanced authentication and format selection
-    console.log("Processing Twitch URL:", url);
-    console.log("URL includes /clip/:", url.includes('/clip/'));
-    
-    // Check if it's a clip URL
-    if (url.includes('/clip/')) {
-      console.log("Processing as Twitch clip");
-      // Special handling for Twitch clips
-      ytCmd = `yt-dlp -f "bestaudio[ext=m4a]/bestaudio/best" --extract-audio --audio-format mp3 --no-playlist --no-warnings --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.twitch.tv/" --add-header "Client-Id:kimne78kx3ncx6brgo4mv6wki5h1ko" -o "${outputPath}" --progress-template "%(progress.downloaded_bytes)s/%(progress.total_bytes)s" "${url}"`;
-    } else {
-      console.log("Processing as Twitch stream/VOD");
-      // Standard Twitch stream/VOD handling
-      ytCmd = `yt-dlp -f "bestaudio[ext=m4a]/bestaudio/best" --extract-audio --audio-format mp3 --no-playlist --no-warnings --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.twitch.tv/" --add-header "Client-Id:kimne78kx3ncx6brgo4mv6wki5h1ko" -o "${outputPath}" --progress-template "%(progress.downloaded_bytes)s/%(progress.total_bytes)s" "${url}"`;
-    }
+  console.log("Starting duration extraction...");
+
+  // Extract video duration first
+  let durationCmd;
+  if (url.includes('twitch.tv')) {
+    durationCmd = `yt-dlp --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.twitch.tv/" --add-header "Client-Id:kimne78kx3ncx6brgo4mv6wki5h1ko" "${url}"`;
   } else {
-    // Standard command for other platforms
-    ytCmd = `yt-dlp -f bestaudio --extract-audio --audio-format mp3 --no-playlist --no-warnings --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -o "${outputPath}" --progress-template "%(progress.downloaded_bytes)s/%(progress.total_bytes)s" "${url}"`;
+    durationCmd = `yt-dlp --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${url}"`;
   }
-  
-  console.log("Running:", ytCmd);
 
-  // Return the downloadId immediately
-  res.json({ 
-    message: "Download started", 
-    downloadId: downloadId
-  });
-
-  // Parse progress from yt-dlp output
-  const child = exec(ytCmd, (err, stdout, stderr) => {
-    if (err) {
-      console.error("yt-dlp error:", err);
-      console.error("stderr:", stderr);
-      console.error("stdout:", stdout);
-      
-      // Update download status
-      const download = activeDownloads.get(downloadId);
-      if (download) {
-        download.status = 'error';
-        download.error = err.message;
+  console.log("About to execute duration command:", durationCmd);
+  exec(durationCmd, (durationErr, durationStdout, durationStderr) => {
+    console.log("Duration extraction started for URL:", url);
+    console.log("Duration command:", durationCmd);
+    console.log("Duration stdout:", durationStdout);
+    console.log("Duration stderr:", durationStderr);
+    console.log("Duration error:", durationErr);
+    
+    let videoDuration = 0;
+    if (!durationErr && durationStdout.trim()) {
+      const durationStr = durationStdout.trim();
+      console.log("Raw duration string:", durationStr);
+      const parts = durationStr.split(':').map(Number);
+      console.log("Duration parts:", parts);
+      if (parts.length === 3) {
+        videoDuration = parts[0] * 3600 + parts[1] * 60 + parts[2];
+      } else if (parts.length === 2) {
+        videoDuration = parts[0] * 60 + parts[1];
+      } else {
+        videoDuration = parts[0];
       }
-      
-      // Note: Can't send error response since we already sent the initial response
-      // The frontend will handle errors via SSE
-      console.error("Download failed:", err.message);
+      console.log("Video duration extracted:", videoDuration, "seconds");
+    } else {
+      console.log("Could not extract duration, proceeding with download");
+      console.log("Duration error details:", durationErr);
+      console.log("Duration stdout details:", durationStdout);
+    }
+    
+    const download = activeDownloads.get(downloadId);
+    if (download) {
+      download.videoDuration = videoDuration;
     }
 
-    console.log("yt-dlp stdout:", stdout);
-
-    // Check if file exists before checking size
-    try {
-      if (fs.existsSync(outputPath)) {
-        // Check file size (25MB limit)
-        const maxSize = 25 * 1024 * 1024; // 25MB in bytes
-        const stats = fs.statSync(outputPath);
-        if (stats.size > maxSize) {
-          fs.unlinkSync(outputPath);
-          // Update download status
-          const download = activeDownloads.get(downloadId);
-          if (download) {
-            download.status = 'error';
-            download.error = 'File too large';
-          }
-          // Note: Can't send error response since we already sent the initial response
-          console.error("File too large: File exceeds 25MB limit");
-        } else {
-          // Update download status to complete
-          const download = activeDownloads.get(downloadId);
-          if (download) {
-            download.status = 'complete';
-            download.progress = 100;
-          }
-        }
+    // Enhanced yt-dlp command with progress tracking - direct MP3 extraction
+    let ytCmd;
+    if (url.includes('tiktok.com')) {
+      // Special handling for TikTok with more flexible format selection
+      ytCmd = `yt-dlp -f "best[height<=720]/best" --extract-audio --audio-format mp3 --no-playlist --no-warnings --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" -o "${outputPath}" --progress-template "%(progress.downloaded_bytes)s/%(progress.total_bytes)s" "${url}"`;
+    } else if (url.includes('twitch.tv')) {
+      // Special handling for Twitch with enhanced authentication and format selection
+      console.log("Processing Twitch URL:", url);
+      console.log("URL includes /clip/:", url.includes('/clip/'));
+      
+      // Check if it's a clip URL
+      if (url.includes('/clip/')) {
+        console.log("Processing as Twitch clip");
+        // Special handling for Twitch clips
+        ytCmd = `yt-dlp -f "bestaudio[ext=m4a]/bestaudio/best" --extract-audio --audio-format mp3 --no-playlist --no-warnings --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.twitch.tv/" --add-header "Client-Id:kimne78kx3ncx6brgo4mv6wki5h1ko" -o "${outputPath}" --progress-template "%(progress.downloaded_bytes)s/%(progress.total_bytes)s" "${url}"`;
       } else {
-        // File doesn't exist, which means download failed
-        console.error("Download failed: Output file does not exist");
+        console.log("Processing as Twitch stream/VOD");
+        // Standard Twitch stream/VOD handling
+        ytCmd = `yt-dlp -f "bestaudio[ext=m4a]/bestaudio/best" --extract-audio --audio-format mp3 --no-playlist --no-warnings --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.twitch.tv/" --add-header "Client-Id:kimne78kx3ncx6brgo4mv6wki5h1ko" -o "${outputPath}" --progress-template "%(progress.downloaded_bytes)s/%(progress.total_bytes)s" "${url}"`;
+      }
+    } else {
+      // Standard command for other platforms
+      ytCmd = `yt-dlp -f bestaudio --extract-audio --audio-format mp3 --no-playlist --no-warnings --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -o "${outputPath}" --progress-template "%(progress.downloaded_bytes)s/%(progress.total_bytes)s" "${url}"`;
+    }
+    
+    console.log("Running:", ytCmd);
+
+    // Return the downloadId and duration immediately
+    console.log("Sending response with duration:", videoDuration);
+    res.json({ 
+      message: "Download started", 
+      downloadId: downloadId,
+      videoDuration: videoDuration
+    });
+
+    // Parse progress from yt-dlp output
+    const child = exec(ytCmd, (err, stdout, stderr) => {
+      if (err) {
+        console.error("yt-dlp error:", err);
+        console.error("stderr:", stderr);
+        console.error("stdout:", stdout);
+        
+        // Update download status
         const download = activeDownloads.get(downloadId);
         if (download) {
           download.status = 'error';
-          download.error = 'Download failed - invalid URL or unsupported content';
+          download.error = err.message;
         }
-      }
-    } catch (fileError) {
-      console.error("Error checking file:", fileError);
-      const download = activeDownloads.get(downloadId);
-      if (download) {
-        download.status = 'error';
-        download.error = 'Download failed - file system error';
-      }
-    }
-
-    // Clean up download tracking after a delay
-    setTimeout(() => {
-      activeDownloads.delete(downloadId);
-    }, 5000);
-
-    // Note: Response already sent, so we can't send another one
-    // The frontend will handle completion via SSE
-  });
-
-  // Parse progress from yt-dlp output
-  child.stdout.on('data', (data) => {
-    const output = data.toString();
-    console.log("yt-dlp output:", output);
-    
-    // Parse progress line
-    const progressMatch = output.match(/(\d+)\/(\d+)/);
-    if (progressMatch) {
-      const downloadedBytes = parseInt(progressMatch[1]);
-      const totalBytes = parseInt(progressMatch[2]);
-      
-      if (totalBytes > 0) {
-        const progress = Math.round((downloadedBytes / totalBytes) * 100); // Full 100% for direct MP3 extraction
         
-        // Update download tracking
+        // Note: Can't send error response since we already sent the initial response
+        // The frontend will handle errors via SSE
+        console.error("Download failed:", err.message);
+      }
+
+      console.log("yt-dlp stdout:", stdout);
+
+      // Check if file exists before checking size
+      try {
+        if (fs.existsSync(outputPath)) {
+          // Check file size (25MB limit)
+          const maxSize = 25 * 1024 * 1024; // 25MB in bytes
+          const stats = fs.statSync(outputPath);
+          if (stats.size > maxSize) {
+            fs.unlinkSync(outputPath);
+            // Update download status
+            const download = activeDownloads.get(downloadId);
+            if (download) {
+              download.status = 'error';
+              download.error = 'File too large';
+            }
+            // Note: Can't send error response since we already sent the initial response
+            console.error("File too large: File exceeds 25MB limit");
+          } else {
+            // Update download status to complete
+            const download = activeDownloads.get(downloadId);
+            if (download) {
+              download.status = 'complete';
+              download.progress = 100;
+            }
+          }
+        } else {
+          // File doesn't exist, which means download failed
+          console.error("Download failed: Output file does not exist");
+          const download = activeDownloads.get(downloadId);
+          if (download) {
+            download.status = 'error';
+            download.error = 'Output file does not exist';
+          }
+        }
+      } catch (error) {
+        console.error("Error checking file:", error);
         const download = activeDownloads.get(downloadId);
         if (download) {
-          download.progress = progress;
-          download.downloadedBytes = downloadedBytes;
-          download.totalBytes = totalBytes;
+          download.status = 'error';
+          download.error = error.message;
         }
-        
-        console.log(`Download progress: ${progress}% (${downloadedBytes}/${totalBytes} bytes)`);
       }
-    }
-  });
+    });
 
-  child.stderr.on('data', (data) => {
-    const output = data.toString();
-    console.log("yt-dlp stderr:", output);
-    
-    // Parse progress line from stderr too
-    const progressMatch = output.match(/download:(\d+)\/(\d+)/);
-    if (progressMatch) {
-      const downloadedBytes = parseInt(progressMatch[1]);
-      const totalBytes = parseInt(progressMatch[2]);
+    // Parse progress from yt-dlp output
+    child.stdout.on('data', (data) => {
+      const output = data.toString();
+      console.log("yt-dlp output:", output);
       
-      if (totalBytes > 0) {
-        const progress = Math.round((downloadedBytes / totalBytes) * 100); // Full 100% for direct MP3 extraction
+      // Parse progress line
+      const progressMatch = output.match(/(\d+)\/(\d+)/);
+      if (progressMatch) {
+        const downloadedBytes = parseInt(progressMatch[1]);
+        const totalBytes = parseInt(progressMatch[2]);
         
-        // Update download tracking
-        const download = activeDownloads.get(downloadId);
-        if (download) {
-          download.progress = progress;
-          download.downloadedBytes = downloadedBytes;
-          download.totalBytes = totalBytes;
+        if (totalBytes > 0) {
+          const progress = Math.round((downloadedBytes / totalBytes) * 100); // Full 100% for direct MP3 extraction
+          
+          // Update download tracking
+          const download = activeDownloads.get(downloadId);
+          if (download) {
+            download.progress = progress;
+            download.downloadedBytes = downloadedBytes;
+            download.totalBytes = totalBytes;
+          }
+          
+          console.log(`Download progress: ${progress}% (${downloadedBytes}/${totalBytes} bytes)`);
         }
-        
-        console.log(`Download progress: ${progress}% (${downloadedBytes}/${totalBytes} bytes)`);
       }
-    }
+    });
+
+    child.stderr.on('data', (data) => {
+      const output = data.toString();
+      console.log("yt-dlp stderr:", output);
+      
+      // Parse progress line from stderr too
+      const progressMatch = output.match(/download:(\d+)\/(\d+)/);
+      if (progressMatch) {
+        const downloadedBytes = parseInt(progressMatch[1]);
+        const totalBytes = parseInt(progressMatch[2]);
+        
+        if (totalBytes > 0) {
+          const progress = Math.round((downloadedBytes / totalBytes) * 100); // Full 100% for direct MP3 extraction
+          
+          // Update download tracking
+          const download = activeDownloads.get(downloadId);
+          if (download) {
+            download.progress = progress;
+            download.downloadedBytes = downloadedBytes;
+            download.totalBytes = totalBytes;
+          }
+          
+          console.log(`Download progress: ${progress}% (${downloadedBytes}/${totalBytes} bytes)`);
+        }
+      }
+    });
   });
 });
 

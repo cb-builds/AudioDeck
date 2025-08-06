@@ -312,23 +312,28 @@ const UploadForm = ({ onFileUploaded }) => {
       
       const data = await res.json();
       console.log("Download started:", data);
+      console.log("Received videoDuration:", data.videoDuration);
+      console.log("Full response data:", JSON.stringify(data, null, 2));
       
       // Start listening for progress updates if we have a downloadId
-              if (data.downloadId) {
-          console.log("Starting progress tracking for downloadId:", data.downloadId);
-          startProgressTracking(data.downloadId, videoName);
-        } else {
-          // Fallback to simulated progress
-          updateProgress(75, "Processing audio...");
-          setStatus("Processing audio...");
-        }
+      if (data.downloadId) {
+        console.log("Starting progress tracking for downloadId:", data.downloadId);
+        startProgressTracking(data.downloadId, videoName);
+      } else {
+        // Fallback to simulated progress
+        updateProgress(75, "Processing audio...");
+        setStatus("Processing audio...");
+      }
       
       // Truncate video name for display
       const truncatedVideoName = truncateText(videoName, 50);
       
+      // Construct filename from downloadId
+      const filename = `${data.downloadId}_imported_video.mp3`;
+      
       // Notify parent component about the uploaded file
       if (onFileUploaded) {
-        onFileUploaded(data.filename, truncatedVideoName);
+        onFileUploaded(filename, truncatedVideoName, data.videoDuration);
       }
       
     } catch (err) {
@@ -417,7 +422,7 @@ const UploadForm = ({ onFileUploaded }) => {
             
             // Notify parent component about the uploaded file
             if (onFileUploaded) {
-              onFileUploaded(filename, truncatedVideoName);
+              onFileUploaded(filename, truncatedVideoName, data.videoDuration);
             }
             
             setTimeout(() => {

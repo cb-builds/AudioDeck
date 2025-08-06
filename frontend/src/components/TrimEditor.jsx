@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import WaveSurfer from "wavesurfer.js";
 import RegionsPlugin from "wavesurfer.js/dist/plugins/regions";
 
-export default function TrimEditor({ clip, originalFileName }) {
+export default function TrimEditor({ clip, originalFileName, expectedDuration = 0 }) {
   const containerRef = useRef(null);
   const wavesurferRef = useRef(null);
   const regionsRef = useRef(null);
@@ -22,6 +22,10 @@ export default function TrimEditor({ clip, originalFileName }) {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [containerWidth, setContainerWidth] = useState(0);
   const isMountedRef = useRef(true);
+  const [isInitializing, setIsInitializing] = useState(false);
+  const hasStartedRef = useRef(false);
+  const retryCountRef = useRef(0);
+  const maxRetries = 30; // Maximum 30 retries (30 seconds)
 
   useEffect(() => {
     return () => {
@@ -33,7 +37,69 @@ export default function TrimEditor({ clip, originalFileName }) {
     if (!clip) return;
 
     console.log("Setting up WaveSurfer for clip:", clip);
+    console.log("Expected duration:", expectedDuration);
+    setStatus("Waiting for download to complete...");
 
+    // Reset state for new clip
+    setIsInitializing(false);
+    setIsReady(false);
+
+    // Simple approach: wait for download to complete, then try to load
+    let retryCount = 0;
+    const maxRetries = 60; // 60 seconds max (increased from 30)
+    
+    const checkDownloadComplete = async () => {
+      if (retryCount >= maxRetries) {
+        console.log("Max retries reached, attempting to load anyway");
+        setStatus("Initializing audio waveform...");
+        initializeWaveSurfer();
+        return;
+      }
+      
+      retryCount++;
+      
+      try {
+        // Check if the file exists and has a reasonable size
+        const response = await fetch(`/clips/${clip}`, { method: 'HEAD' });
+        if (response.ok) {
+          const contentLength = response.headers.get('content-length');
+          if (contentLength && parseInt(contentLength) > 1000000) { // At least 1MB
+            // Additional check: wait a bit longer for file processing
+            if (retryCount < 10) {
+              console.log(`File exists but waiting for processing, retry ${retryCount}/${maxRetries}`);
+              setTimeout(checkDownloadComplete, 2000); // Wait 2 seconds
+              return;
+            }
+            console.log("File appears to be complete, attempting to load WaveSurfer");
+            setStatus("Initializing audio waveform...");
+            initializeWaveSurfer();
+          } else {
+            console.log(`File too small (${contentLength} bytes), retry ${retryCount}/${maxRetries}`);
+            setTimeout(checkDownloadComplete, 1000);
+          }
+        } else {
+          console.log(`File not found, retry ${retryCount}/${maxRetries}`);
+          setTimeout(checkDownloadComplete, 1000);
+        }
+      } catch (error) {
+        console.log(`Error checking file, retry ${retryCount}/${maxRetries}:`, error);
+        setTimeout(checkDownloadComplete, 1000);
+      }
+    };
+
+    // Start checking after a longer delay to ensure file is fully processed
+    const timer = setTimeout(checkDownloadComplete, 5000); // Increased from 2000 to 5000
+
+    return () => {
+      clearTimeout(timer);
+      if (wavesurferRef.current) {
+        wavesurferRef.current.destroy();
+      }
+    };
+  }, [clip]);
+
+  // Function to initialize WaveSurfer
+  const initializeWaveSurfer = () => {
     if (wavesurferRef.current) {
       wavesurferRef.current.destroy();
     }
@@ -69,15 +135,55 @@ export default function TrimEditor({ clip, originalFileName }) {
     // const audio = new Audio(`http://localhost:4000/clips/${clip}`);
     // audioRef.current = audio;
 
+    // Track retry attempts for duration validation
+    let durationRetryCount = 0;
+    const maxDurationRetries = 5; // Only retry 5 times for duration issues
+
     wavesurfer.on("ready", () => {
       wavesurferRef.current = wavesurfer;
       regionsRef.current = regionsPlugin;
       
-      setIsReady(true);
-      setDuration(wavesurfer.getDuration());
+      const actualDuration = wavesurfer.getDuration();
       console.log("WaveSurfer ready");
-      console.log("Duration:", wavesurfer.getDuration());
+      console.log("Duration:", actualDuration);
       console.log("Regions plugin:", regionsRef.current);
+      
+      // Check if the duration is reasonable (should be around 954 seconds for this video)
+      // If it's significantly shorter, the file might not be fully loaded
+      if (expectedDuration > 0 && actualDuration < (expectedDuration * 0.9)) { // Allow 10% tolerance
+        if (durationRetryCount < maxDurationRetries) {
+          durationRetryCount++;
+          console.log(`Duration too short: ${actualDuration}s vs expected ${expectedDuration}s. Retry ${durationRetryCount}/${maxDurationRetries}...`);
+          setStatus("File appears incomplete, retrying...");
+          wavesurfer.destroy();
+          setTimeout(() => {
+            initializeWaveSurfer();
+          }, 3000); // Wait 3 seconds before retry
+          return;
+        } else {
+          console.log(`Max duration retries reached (${maxDurationRetries}), accepting current duration: ${actualDuration}s`);
+        }
+      }
+      
+      // If we don't have expected duration, only retry if duration is clearly too short (< 5 minutes)
+      if (expectedDuration === 0 && actualDuration < 300) {
+        if (durationRetryCount < maxDurationRetries) {
+          durationRetryCount++;
+          console.log(`Duration too short (${actualDuration}s), retry ${durationRetryCount}/${maxDurationRetries}...`);
+          setStatus("File appears incomplete, retrying...");
+          wavesurfer.destroy();
+          setTimeout(() => {
+            initializeWaveSurfer();
+          }, 3000); // Wait 3 seconds before retry
+          return;
+        } else {
+          console.log(`Max duration retries reached (${maxDurationRetries}), accepting current duration: ${actualDuration}s`);
+        }
+      }
+      
+      setIsReady(true);
+      setIsInitializing(false); // Reset initialization flag
+      setDuration(actualDuration);
       
       // Add a default region
       try {
@@ -171,8 +277,11 @@ export default function TrimEditor({ clip, originalFileName }) {
           wavesurferRef.current = fallbackWavesurfer;
           regionsRef.current = regionsPlugin;
           setIsReady(true);
+          setIsInitializing(false); // Reset initialization flag
+          retryCountRef.current = 0; // Reset retry counter on success
           setDuration(fallbackWavesurfer.getDuration());
           console.log("Fallback WaveSurfer ready");
+          console.log("Duration:", fallbackWavesurfer.getDuration());
           
           // Add default region
           try {
@@ -286,18 +395,7 @@ export default function TrimEditor({ clip, originalFileName }) {
       setStartTime(region.start.toFixed(2));
       setEndTime(region.end.toFixed(2));
     });
-
-    return () => {
-      if (progressTimerRef.current) {
-        clearInterval(progressTimerRef.current);
-      }
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-      wavesurfer.destroy();
-    };
-  }, [clip]);
+  };
 
   // Check if region handles are visible and if drag should be disabled
   const shouldDisableDrag = () => {
