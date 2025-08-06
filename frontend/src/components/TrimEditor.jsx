@@ -165,8 +165,8 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
         }
       }
       
-      // If we don't have expected duration, only retry if duration is clearly too short (< 5 minutes)
-      if (expectedDuration === 0 && actualDuration < 300) {
+      // If we don't have expected duration, only retry if duration is clearly too short (< 1 second)
+      if (expectedDuration === 0 && actualDuration < 1) {
         if (durationRetryCount < maxDurationRetries) {
           durationRetryCount++;
           console.log(`Duration too short (${actualDuration}s), retry ${durationRetryCount}/${maxDurationRetries}...`);

@@ -93,11 +93,13 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       updateProgress(100, "Upload complete!");
 
       const data = await res.json();
+      console.log("Upload response data:", data);
       setStatus(`Uploaded as: ${data.filename}`);
       
       // Notify parent component about the uploaded file
       if (onFileUploaded) {
-        onFileUploaded(data.filename, fileToUpload.name); // Pass both server filename and original filename
+        console.log("Calling onFileUploaded with duration:", data.videoDuration || 0);
+        onFileUploaded(data.filename, fileToUpload.name, data.videoDuration || 0); // Pass server filename, original filename, and duration
       }
       
       // Hide progress after a delay
@@ -334,10 +336,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       // Construct filename from downloadId
       const filename = `${data.downloadId}_imported_video.mp3`;
       
-      // Notify parent component about the uploaded file
-      if (onFileUploaded) {
-        onFileUploaded(filename, truncatedVideoName, data.videoDuration);
-      }
+      // Don't call onFileUploaded here - wait for successful completion via SSE
       
     } catch (err) {
       console.error("Video upload error:", err);
@@ -409,6 +408,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
               newSet.delete(currentDownloadId);
               return newSet;
             });
+            setIsVideoUploading(false); // Reset upload state
             return;
           }
           
@@ -416,7 +416,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
           setStatus(`Downloading: ${downloadedFormatted} / ${totalFormatted}`);
           
           // If progress is 100% or status is complete, handle completion
-          if ((progress >= 100 || status === 'complete') && !completionHandled) {
+          if ((progress >= 100 || status === 'complete') && !completionHandled && !errorHandled) {
             completionHandled = true; // Mark as handled to prevent duplicate calls
             
             // Extract filename from downloadId (assuming format: downloadId_imported_video.mp3)

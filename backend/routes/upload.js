@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const path = require("path");
 const fs = require("fs");
+const { exec } = require("child_process");
 
 const CLIPS_DIR = path.join(__dirname, "../clips");
 
@@ -29,7 +30,37 @@ router.post("/", (req, res) => {
 
   file.mv(savePath, err => {
     if (err) return res.status(500).send(err);
-    res.json({ message: "File uploaded", filename });
+    
+    // Extract duration using ffmpeg (cross-platform)
+    console.log("Extracting duration for uploaded file:", filename);
+    const ffmpegCmd = `ffmpeg -i "${savePath}" -f null - 2>&1`;
+    
+    exec(ffmpegCmd, (durationErr, durationStdout, durationStderr) => {
+      let videoDuration = 0;
+      
+      if (!durationErr) {
+        // Parse duration from ffmpeg output (format: Duration: 00:00:08.62, start: 0.000000, bitrate: 128 kb/s)
+        const durationMatch = durationStdout.match(/Duration: (\d{2}):(\d{2}):(\d{2}\.\d{2})/);
+        if (durationMatch) {
+          const hours = parseInt(durationMatch[1]);
+          const minutes = parseInt(durationMatch[2]);
+          const seconds = parseFloat(durationMatch[3]);
+          videoDuration = hours * 3600 + minutes * 60 + seconds;
+          console.log("Duration extracted:", videoDuration, "seconds");
+        } else {
+          console.log("Could not parse duration from ffmpeg output:", durationStdout);
+        }
+      } else {
+        console.log("Error extracting duration:", durationErr);
+        console.log("ffmpeg stderr:", durationStderr);
+      }
+      
+      res.json({ 
+        message: "File uploaded", 
+        filename,
+        videoDuration: videoDuration
+      });
+    });
   });
 });
 
