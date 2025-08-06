@@ -220,11 +220,14 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
       setIsInitializing(false); // Reset initialization flag
       setDuration(actualDuration);
       
-      // Add a default region
+      // Add a default region using 25% and 75% of duration
       try {
+        const startTime = Math.max(0, actualDuration * 0.25);
+        const endTime = Math.min(actualDuration, actualDuration * 0.75);
+        
         const defaultRegion = regionsRef.current.addRegion({
-          start: 0,
-          end: 5,
+          start: startTime,
+          end: endTime,
           color: "rgba(135, 206, 250, 0.3)", // Light blue highlight
           drag: !shouldDisableDrag(), // Disable drag if handles not visible
           resize: true,
@@ -232,11 +235,12 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
         
         regionRef.current = defaultRegion;
         console.log("Default region created:", defaultRegion);
+        console.log(`Region spans ${startTime.toFixed(2)}s to ${endTime.toFixed(2)}s (25%-75% of ${actualDuration.toFixed(2)}s)`);
         setStatus("Default region created successfully");
         
         // Update timestamp inputs
-        setStartTime("0.00");
-        setEndTime("5.00");
+        setStartTime(startTime.toFixed(2));
+        setEndTime(endTime.toFixed(2));
       } catch (error) {
         console.error("Error creating default region:", error);
         setStatus("Error creating default region: " + error.message);
