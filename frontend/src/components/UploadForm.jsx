@@ -163,8 +163,8 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       }
       
       console.log("Proceeding to download phase...");
-      startProgress("Downloading video...");
-      setStatus("Downloading video...");
+      startProgress("Gathering Video Metadata...");
+      setStatus("Gathering Video Metadata...");
       
       // Get video title before downloading
       let videoName = "Imported Video";
