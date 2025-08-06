@@ -412,8 +412,14 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
             return;
           }
           
-          updateProgress(progress, `Downloading: ${downloadedFormatted} / ${totalFormatted}`);
-          setStatus(`Downloading: ${downloadedFormatted} / ${totalFormatted}`);
+          // Show "Preparing Download..." until we have actual file sizes
+          if (downloadedBytes === 0 && totalBytes === 0) {
+            updateProgress(progress, "Preparing Download...");
+            setStatus("Preparing Download...");
+          } else {
+            updateProgress(progress, `Downloading: ${downloadedFormatted} / ${totalFormatted}`);
+            setStatus(`Downloading: ${downloadedFormatted} / ${totalFormatted}`);
+          }
           
           // If progress is 100% or status is complete, handle completion
           if ((progress >= 100 || status === 'complete') && !completionHandled && !errorHandled) {
