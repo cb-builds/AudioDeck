@@ -33,10 +33,15 @@ export default function TrimEditor({ clip, originalFileName }) {
     if (!clip) return;
 
     console.log("Setting up WaveSurfer for clip:", clip);
+    setStatus("Generating audio waveform...");
 
-    if (wavesurferRef.current) {
-      wavesurferRef.current.destroy();
-    }
+    // 5-second delay to ensure file is ready
+    const delayTimer = setTimeout(() => {
+      console.log("Starting WaveSurfer initialization after 5-second delay");
+      
+      if (wavesurferRef.current) {
+        wavesurferRef.current.destroy();
+      }
 
     // Get container width for zoom calculations
     if (containerRef.current) {
@@ -287,7 +292,12 @@ export default function TrimEditor({ clip, originalFileName }) {
       setEndTime(region.end.toFixed(2));
     });
 
+    }, 5000); // 5-second delay
+
     return () => {
+      if (delayTimer) {
+        clearTimeout(delayTimer);
+      }
       if (progressTimerRef.current) {
         clearInterval(progressTimerRef.current);
       }
@@ -295,7 +305,9 @@ export default function TrimEditor({ clip, originalFileName }) {
         audioRef.current.pause();
         audioRef.current = null;
       }
-      wavesurfer.destroy();
+      if (wavesurferRef.current) {
+        wavesurferRef.current.destroy();
+      }
     };
   }, [clip]);
 
