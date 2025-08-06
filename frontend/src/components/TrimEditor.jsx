@@ -23,6 +23,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
   const [containerWidth, setContainerWidth] = useState(0);
   const isMountedRef = useRef(true);
   const [isInitializing, setIsInitializing] = useState(false);
+  const [isWaveformReady, setIsWaveformReady] = useState(false);
   const hasStartedRef = useRef(false);
   const retryCountRef = useRef(0);
   const maxRetries = 30; // Maximum 30 retries (30 seconds)
@@ -43,6 +44,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
     // Reset state for new clip
     setIsInitializing(false);
     setIsReady(false);
+    setIsWaveformReady(false); // Reset waveform ready flag
 
     // Simple approach: wait for download to complete, then try to load
     let retryCount = 0;
@@ -217,6 +219,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
       }
       
       setIsReady(true);
+      setIsWaveformReady(true); // Mark waveform as ready
       setIsInitializing(false); // Reset initialization flag
       setDuration(actualDuration);
       
@@ -316,6 +319,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
           wavesurferRef.current = fallbackWavesurfer;
           regionsRef.current = regionsPlugin;
           setIsReady(true);
+          setIsWaveformReady(true); // Mark waveform as ready
           setIsInitializing(false); // Reset initialization flag
           retryCountRef.current = 0; // Reset retry counter on success
           setDuration(fallbackWavesurfer.getDuration());
@@ -1228,7 +1232,12 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
             border: '1px solid rgba(167, 139, 250, 0.3)'
           }}
         >
-          <p className="text-white font-medium">{status}</p>
+          <div className="flex items-center justify-center">
+            {!isWaveformReady && status.includes("Processing audio waveform") && (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+            )}
+            <p className="text-white font-medium">{status}</p>
+          </div>
         </div>
       )}
     </div>
