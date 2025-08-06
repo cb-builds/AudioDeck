@@ -118,8 +118,8 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
     
     console.log("=== Starting video download ===");
     setIsVideoUploading(true);
-    startProgress("Getting Video Metadata...");
-    setStatus("Getting Video Metadata...");
+    startProgress("Gathering Video Metadata...");
+    setStatus("Gathering Video Metadata...");
     
     try {
       console.log("Starting video download for URL:", ytUrl);
