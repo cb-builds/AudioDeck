@@ -156,12 +156,14 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
       console.log("Duration:", actualDuration);
       console.log("Regions plugin:", regionsRef.current);
       
-      // Check if the duration is reasonable (should be around 954 seconds for this video)
-      // If it's significantly shorter, the file might not be fully loaded
-      if (expectedDuration > 0 && actualDuration < (expectedDuration * 0.9)) { // Allow 10% tolerance
+      // Log duration comparison for debugging
+      console.log(`Duration comparison: ${actualDuration}s vs expected ${expectedDuration}s`);
+      
+      // Only retry if duration is clearly too short (< 1 second) for any file
+      if (actualDuration < 1) {
         if (durationRetryCount < maxDurationRetries) {
           durationRetryCount++;
-          console.log(`Duration too short: ${actualDuration}s vs expected ${expectedDuration}s. Retry ${durationRetryCount}/${maxDurationRetries}...`);
+          console.log(`Duration too short (${actualDuration}s), retry ${durationRetryCount}/${maxDurationRetries}...`);
           setStatus("File appears incomplete, retrying...");
           wavesurfer.destroy();
           setTimeout(() => {
@@ -172,6 +174,9 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
           console.log(`Max duration retries reached (${maxDurationRetries}), accepting current duration: ${actualDuration}s`);
         }
       }
+      
+      // Accept the actual duration, even if it's shorter than expected
+      console.log(`Accepting duration: ${actualDuration}s (expected was ${expectedDuration}s)`);
       
       // If we don't have expected duration, only retry if duration is clearly too short (< 1 second)
       if (expectedDuration === 0 && actualDuration < 1) {
