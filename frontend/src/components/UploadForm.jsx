@@ -16,6 +16,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
   const [progressText, setProgressText] = useState("");
   const [currentVideoName, setCurrentVideoName] = useState("");
   const [activeSSEConnections, setActiveSSEConnections] = useState(new Set());
+  const [isDownloadStarted, setIsDownloadStarted] = useState(false);
 
   const showErrorPopup = (title, message) => {
     setPopupTitle(title);
@@ -118,6 +119,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
     
     console.log("=== Starting video download ===");
     setIsVideoUploading(true);
+    setIsDownloadStarted(false); // Reset download started flag
     startProgress("Gathering Video Metadata...");
     setStatus("Gathering Video Metadata...");
     
@@ -417,6 +419,10 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
             updateProgress(progress, "Preparing Download...");
             setStatus("Preparing Download...");
           } else {
+            // Download has actually started - set the flag
+            if (!isDownloadStarted) {
+              setIsDownloadStarted(true);
+            }
             updateProgress(progress, `Downloading: ${downloadedFormatted} / ${totalFormatted}`);
             setStatus(`Downloading: ${downloadedFormatted} / ${totalFormatted}`);
           }
@@ -621,7 +627,12 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
             
             <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-300">{progressText}</span>
+                <div className="flex items-center">
+                  {!isDownloadStarted && showProgress && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  )}
+                  <span className="text-sm text-gray-300">{progressText}</span>
+                </div>
                 <span className="text-sm text-gray-400">{progressValue}%</span>
               </div>
               
