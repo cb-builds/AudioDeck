@@ -1233,7 +1233,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
           }}
         >
           <div className="flex items-center justify-center">
-            {!isWaveformReady && status.includes("Processing audio waveform") && (
+            {!isWaveformReady && (status.includes("Processing audio waveform") || status.includes("Initializing audio waveform")) && (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
             )}
             <p className="text-white font-medium">{status}</p>
