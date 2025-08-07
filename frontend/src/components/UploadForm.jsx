@@ -364,7 +364,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
     const eventSource = new EventSource(`/api/youtube/progress/${downloadId}`);
     
     eventSource.onopen = () => {
-      console.log("SSE connection opened");
+      console.log(`SSE connection opened for downloadId: ${downloadId}`);
     };
     
     // Store the downloadId and video name for use in completion
@@ -376,7 +376,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log("Progress update:", data);
+        console.log("SSE Progress update received:", data);
         
         if (data.type === 'progress') {
           const progress = data.progress || 0;
@@ -430,10 +430,13 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
           // If progress is 100% or status is complete, handle completion
           if ((progress >= 100 || status === 'complete') && !completionHandled && !errorHandled) {
             completionHandled = true; // Mark as handled to prevent duplicate calls
+            console.log(`Download completion detected for ${currentDownloadId}. Progress: ${progress}%, Status: ${status}`);
             
             // Extract filename from downloadId (assuming format: downloadId_imported_video.mp3)
             const filename = `${currentDownloadId}_imported_video.mp3`;
             const truncatedVideoName = truncateText(currentVideoName, 50);
+            
+            console.log(`Notifying parent component with filename: ${filename}`);
             
             // Notify parent component about the uploaded file
             if (onFileUploaded) {
@@ -441,6 +444,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
             }
             
             setTimeout(() => {
+              console.log(`Hiding progress and closing SSE connection for ${currentDownloadId}`);
               hideProgress();
               eventSource.close(); // Close SSE connection after completion
               // Remove from active connections
@@ -458,7 +462,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
     };
     
     eventSource.onerror = (error) => {
-      console.error("SSE error:", error);
+      console.error(`SSE error for downloadId ${downloadId}:`, error);
       eventSource.close();
     };
     

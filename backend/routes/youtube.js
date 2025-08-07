@@ -42,7 +42,7 @@ router.get("/progress/:downloadId", (req, res) => {
   const progressInterval = setInterval(() => {
     const download = activeDownloads.get(downloadId);
     if (download) {
-      res.write(`data: ${JSON.stringify({ 
+      const progressData = { 
         type: 'progress', 
         progress: download.progress,
         downloadedBytes: download.downloadedBytes,
@@ -50,7 +50,19 @@ router.get("/progress/:downloadId", (req, res) => {
         status: download.status,
         error: download.error,
         videoDuration: download.videoDuration // Include video duration in interval updates
-      })}\n\n`);
+      };
+      
+      console.log(`Sending SSE progress update for ${downloadId}:`, progressData);
+      res.write(`data: ${JSON.stringify(progressData)}\n\n`);
+      
+      // If download is complete, close the connection after sending the final update
+      if (download.status === 'complete' || download.status === 'error') {
+        console.log(`Download ${downloadId} is ${download.status}, closing SSE connection`);
+        clearInterval(progressInterval);
+        res.end();
+      }
+    } else {
+      console.log(`No download tracking found for ${downloadId}`);
     }
   }, 1000);
 
@@ -366,6 +378,8 @@ router.post("/", (req, res) => {
           // Check file size (25MB limit)
           const maxSize = 25 * 1024 * 1024; // 25MB in bytes
           const stats = fs.statSync(outputPath);
+          console.log(`Download completed. File size: ${stats.size} bytes`);
+          
           if (stats.size > maxSize) {
             fs.unlinkSync(outputPath);
             // Update download status
@@ -374,7 +388,6 @@ router.post("/", (req, res) => {
               download.status = 'error';
               download.error = 'File too large';
             }
-            // Note: Can't send error response since we already sent the initial response
             console.error("File too large: File exceeds 25MB limit");
           } else {
             // Update download status to complete
@@ -382,6 +395,9 @@ router.post("/", (req, res) => {
             if (download) {
               download.status = 'complete';
               download.progress = 100;
+              console.log(`Download marked as complete for downloadId: ${downloadId}`);
+            } else {
+              console.error(`Download tracking not found for downloadId: ${downloadId}`);
             }
           }
         } else {
