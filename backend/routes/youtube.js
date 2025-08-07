@@ -386,11 +386,11 @@ router.post("/", (req, res) => {
           }
         } else {
           // File doesn't exist, which means download failed
-          console.error("Download failed: Output file does not exist");
+          console.error("Download failed: Output file not found. Please try again");
           const download = activeDownloads.get(downloadId);
           if (download) {
             download.status = 'error';
-            download.error = 'Output file does not exist';
+            download.error = 'Output file not found. Please try again';
           }
         }
       } catch (error) {
