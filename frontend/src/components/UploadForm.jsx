@@ -77,6 +77,22 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
+      // Check file type (audio/video only)
+      const allowedTypes = [
+        'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/m4a', 'audio/aac', 'audio/ogg', 'audio/flac',
+        'video/mp4', 'video/webm', 'video/ogg', 'video/avi', 'video/mov', 'video/wmv', 'video/flv',
+        'audio/x-m4a', 'audio/mp4', 'video/x-msvideo', 'video/quicktime'
+      ];
+      
+      if (!allowedTypes.includes(selectedFile.type)) {
+        showErrorPopup(
+          "❌ Unsupported File Type",
+          `The file you selected is not a supported audio or video format.\n\nFile type: ${selectedFile.type || 'Unknown'}\n\nPlease select an audio or video file (MP3, WAV, M4A, MP4, etc.).`
+        );
+        setStatus("Unsupported file type. Please select an audio or video file.");
+        return;
+      }
+      
       // Check file size (25MB limit)
       const maxSize = 25 * 1024 * 1024; // 25MB in bytes
       if (selectedFile.size > maxSize) {
