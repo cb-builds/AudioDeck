@@ -42,17 +42,66 @@ router.get("/progress/:downloadId", (req, res) => {
   const progressInterval = setInterval(() => {
     const download = activeDownloads.get(downloadId);
     if (download) {
-      res.write(`data: ${JSON.stringify({ 
+      // Check if output file exists and get its current size
+      if (fs.existsSync(download.outputPath)) {
+        try {
+          const stats = fs.statSync(download.outputPath);
+          const currentSize = stats.size;
+          
+          // Only update if file size has changed significantly (>1KB difference)
+          if (Math.abs(currentSize - (download.downloadedBytes || 0)) > 1024) {
+            download.downloadedBytes = currentSize;
+            
+            // Estimate total size based on typical MP3 compression ratio
+            // For audio files, we can estimate based on duration and bitrate
+            if (download.totalBytes === 0) {
+              // Estimate based on typical MP3 compression (128kbps = ~1MB per 8 minutes)
+              // This is a rough estimate that will be refined as the file grows
+              const estimatedSizePerMinute = 1024 * 1024 / 8; // ~1MB per 8 minutes
+              const estimatedDuration = download.videoDuration || 300; // Default 5 minutes
+              download.totalBytes = Math.max(
+                Math.round(estimatedSizePerMinute * (estimatedDuration / 60)),
+                currentSize * 1.5 // At least 1.5x current size
+              );
+            }
+            
+            // Calculate progress based on current file size vs estimated total
+            // Cap at 99% until download is actually complete
+            const progress = Math.min(Math.round((currentSize / download.totalBytes) * 100), 99);
+            
+            // Only update if progress has changed significantly (>1%)
+            if (Math.abs(progress - (download.progress || 0)) > 1) {
+              download.progress = progress;
+              console.log(`File size progress: ${progress}% (${currentSize} bytes / ~${Math.round(download.totalBytes / 1024 / 1024)}MB)`);
+            }
+          }
+        } catch (error) {
+          console.error("Error checking file size:", error);
+        }
+      }
+      
+      const progressData = { 
         type: 'progress', 
         progress: download.progress,
         downloadedBytes: download.downloadedBytes,
         totalBytes: download.totalBytes,
         status: download.status,
         error: download.error,
-        videoDuration: download.videoDuration // Include video duration in interval updates
-      })}\n\n`);
+        videoDuration: download.videoDuration
+      };
+      
+      res.write(`data: ${JSON.stringify(progressData)}\n\n`);
+      
+      // If download is complete, close the connection after sending the final update
+      if (download.status === 'complete' || download.status === 'error') {
+        console.log(`Download ${downloadId} is ${download.status}, closing SSE connection`);
+        clearInterval(progressInterval);
+        res.end();
+      }
+    } else {
+      console.log(`No download tracking found for ${downloadId}`);
     }
-  }, 1000);
+  }, 500); // Check every 500ms for smoother updates
 
   // Clean up on client disconnect
   req.on('close', () => {
@@ -258,7 +307,8 @@ router.post("/", (req, res) => {
     downloadedBytes: 0,
     totalBytes: 0,
     status: 'downloading',
-    videoDuration: 0 // Store video duration
+    videoDuration: 0, // Store video duration
+    outputPath: outputPath // Store the output path for progress tracking
   });
 
   console.log("Starting duration extraction...");
@@ -362,14 +412,16 @@ router.post("/", (req, res) => {
 
       // Check if file exists before checking size
       try {
-        if (fs.existsSync(outputPath)) {
+        const download = activeDownloads.get(downloadId);
+        const filePath = download ? download.outputPath : outputPath;
+        
+        if (fs.existsSync(filePath)) {
           // Check file size (25MB limit)
           const maxSize = 25 * 1024 * 1024; // 25MB in bytes
-          const stats = fs.statSync(outputPath);
+          const stats = fs.statSync(filePath);
           if (stats.size > maxSize) {
-            fs.unlinkSync(outputPath);
+            fs.unlinkSync(filePath);
             // Update download status
-            const download = activeDownloads.get(downloadId);
             if (download) {
               download.status = 'error';
               download.error = 'File too large';
@@ -378,16 +430,17 @@ router.post("/", (req, res) => {
             console.error("File too large: File exceeds 25MB limit");
           } else {
             // Update download status to complete
-            const download = activeDownloads.get(downloadId);
             if (download) {
               download.status = 'complete';
               download.progress = 100;
+              download.downloadedBytes = stats.size;
+              download.totalBytes = stats.size; // Set actual final size
+              console.log(`Download completed: ${stats.size} bytes`);
             }
           }
         } else {
           // File doesn't exist, which means download failed
           console.error("Download failed: Output file not found. Please try again");
-          const download = activeDownloads.get(downloadId);
           if (download) {
             download.status = 'error';
             download.error = 'Output file not found. Please try again';
@@ -406,53 +459,17 @@ router.post("/", (req, res) => {
     // Parse progress from yt-dlp output
     child.stdout.on('data', (data) => {
       const output = data.toString();
-      console.log("yt-dlp output:", output);
-      
-      // Parse progress line
-      const progressMatch = output.match(/(\d+)\/(\d+)/);
-      if (progressMatch) {
-        const downloadedBytes = parseInt(progressMatch[1]);
-        const totalBytes = parseInt(progressMatch[2]);
-        
-        if (totalBytes > 0) {
-          const progress = Math.round((downloadedBytes / totalBytes) * 100); // Full 100% for direct MP3 extraction
-          
-          // Update download tracking
-          const download = activeDownloads.get(downloadId);
-          if (download) {
-            download.progress = progress;
-            download.downloadedBytes = downloadedBytes;
-            download.totalBytes = totalBytes;
-          }
-          
-          console.log(`Download progress: ${progress}% (${downloadedBytes}/${totalBytes} bytes)`);
-        }
+      // Only log if there's an error or important message
+      if (output.includes('ERROR') || output.includes('WARNING')) {
+        console.log("yt-dlp output:", output);
       }
     });
 
     child.stderr.on('data', (data) => {
       const output = data.toString();
-      console.log("yt-dlp stderr:", output);
-      
-      // Parse progress line from stderr too
-      const progressMatch = output.match(/download:(\d+)\/(\d+)/);
-      if (progressMatch) {
-        const downloadedBytes = parseInt(progressMatch[1]);
-        const totalBytes = parseInt(progressMatch[2]);
-        
-        if (totalBytes > 0) {
-          const progress = Math.round((downloadedBytes / totalBytes) * 100); // Full 100% for direct MP3 extraction
-          
-          // Update download tracking
-          const download = activeDownloads.get(downloadId);
-          if (download) {
-            download.progress = progress;
-            download.downloadedBytes = downloadedBytes;
-            download.totalBytes = totalBytes;
-          }
-          
-          console.log(`Download progress: ${progress}% (${downloadedBytes}/${totalBytes} bytes)`);
-        }
+      // Only log if there's an error or important message
+      if (output.includes('ERROR') || output.includes('WARNING')) {
+        console.log("yt-dlp stderr:", output);
       }
     });
   });
