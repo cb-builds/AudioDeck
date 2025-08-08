@@ -590,7 +590,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
           >
             <input
               type="file"
-              accept="audio/*,video/*"
+              accept=".mp3,.wav,.m4a,.aac,.ogg,.flac,.mp4,.webm,.avi,.mov,.wmv,.flv,.mkv"
               onChange={handleFileChange}
               className="hidden"
               id="file-upload"
