@@ -590,7 +590,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
           >
             <input
               type="file"
-              accept="audio/*"
+              accept="audio/*,video/*"
               onChange={handleFileChange}
               className="hidden"
               id="file-upload"
