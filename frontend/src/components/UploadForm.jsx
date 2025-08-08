@@ -18,6 +18,33 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
   const [activeSSEConnections, setActiveSSEConnections] = useState(new Set());
   const [isDownloadStarted, setIsDownloadStarted] = useState(false);
 
+  // Helper to add a timeout to fetch requests
+  const fetchWithTimeout = (url, options = {}, timeoutMs = 10000) => {
+    return new Promise((resolve, reject) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+        // Map timeout to the existing backend error message for consistency
+        reject(new Error('Output file not found. Please check link and try again.'));
+      }, timeoutMs);
+
+      fetch(url, { ...options, signal: controller.signal })
+        .then((res) => {
+          clearTimeout(timeoutId);
+          resolve(res);
+        })
+        .catch((err) => {
+          clearTimeout(timeoutId);
+          if (err.name === 'AbortError') {
+            // Ensure consistent error message on timeout
+            reject(new Error('Output file not found. Please check link and try again.'));
+          } else {
+            reject(err);
+          }
+        });
+    });
+  };
+
   const showErrorPopup = (title, message) => {
     setPopupTitle(title);
     setPopupMessage(message);
@@ -85,7 +112,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
         });
       }, 200);
 
-      const res = await fetch("/api/upload", {
+      const res = await fetchWithTimeout("/api/upload", {
         method: "POST",
         body: formData,
       });
@@ -130,7 +157,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       console.log("Checking video duration...");
       try {
         console.log("Making duration request to:", `/api/youtube/duration?url=${encodeURIComponent(ytUrl)}`);
-        const durationRes = await fetch(`/api/youtube/duration?url=${encodeURIComponent(ytUrl)}`);
+        const durationRes = await fetchWithTimeout(`/api/youtube/duration?url=${encodeURIComponent(ytUrl)}`);
         console.log("Duration response status:", durationRes.status);
         
         if (durationRes.ok) {
@@ -158,10 +185,24 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
           console.log("Duration response not ok, status:", durationRes.status);
           const errorText = await durationRes.text();
           console.log("Duration error response:", errorText);
+          hideProgress();
+          const message = 'Output file not found. Please check link and try again.';
+          showErrorPopup("❌ Download Failed", message);
+          setStatus(`Download failed: ${message}`);
+          setIsVideoUploading(false);
+          return;
         }
       } catch (durationError) {
         console.log("Duration check failed with error:", durationError);
-        // Don't hide progress here - let the download continue
+        // Fail fast on duration errors/timeouts and stop further API calls
+        hideProgress();
+        const message = (durationError && typeof durationError.message === 'string' && durationError.message.includes('Output file not found'))
+          ? durationError.message
+          : 'Output file not found. Please check link and try again.';
+        showErrorPopup("❌ Download Failed", message);
+        setStatus(`Download failed: ${message}`);
+        setIsVideoUploading(false);
+        return;
       }
       
       console.log("Proceeding to download phase...");
@@ -172,7 +213,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       let videoName = "Imported Video";
       try {
         console.log("Getting video title...");
-        const titleRes = await fetch(`/api/youtube/title?url=${encodeURIComponent(ytUrl)}`);
+        const titleRes = await fetchWithTimeout(`/api/youtube/title?url=${encodeURIComponent(ytUrl)}`);
         
         if (titleRes.ok) {
           const titleData = await titleRes.json();
@@ -269,7 +310,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       setCurrentVideoName(videoName);
       
       console.log("Making download request to /api/youtube");
-      const res = await fetch("/api/youtube", {
+      const res = await fetchWithTimeout("/api/youtube", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -343,7 +384,13 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
     } catch (err) {
       console.error("Video upload error:", err);
       hideProgress();
-      setStatus(`Video upload failed: ${err.message}`);
+      // If this was a timeout, surface the known error to the user consistently
+      if (err && typeof err.message === 'string' && err.message.includes('Output file not found')) {
+        showErrorPopup("❌ Download Failed", err.message);
+        setStatus(`Download failed: ${err.message}`);
+      } else {
+        setStatus(`Video upload failed: ${err.message}`);
+      }
     } finally {
       setIsVideoUploading(false);
     }
