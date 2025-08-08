@@ -238,8 +238,10 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
         return;
       }
       
+      // Progress: 10% after duration check
+      updateProgress(10, "Gathering Video Metadata...");
+      
       console.log("Proceeding to download phase...");
-      startProgress("Gathering Video Metadata...");
       setStatus("Gathering Video Metadata...");
       
       // Get video title before downloading
@@ -339,6 +341,9 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
         }
       }
       
+      // Progress: 20% after title extraction
+      updateProgress(20, "Gathering Video Metadata...");
+      
       // Store the video name in state for use in SSE handler
       setCurrentVideoName(videoName);
       
@@ -355,6 +360,9 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       });
       
       console.log("Download response status:", res.status);
+      
+      // Progress: 30% after download request
+      updateProgress(30, "Gathering Video Metadata...");
       
       if (!res.ok) {
         const errorData = await res.json();
@@ -395,6 +403,9 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       console.log("Download started:", data);
       console.log("Received videoDuration:", data.videoDuration);
       console.log("Full response data:", JSON.stringify(data, null, 2));
+      
+      // Progress: 40% after response data
+      updateProgress(40, "Gathering Video Metadata...");
       
       // Start listening for progress updates if we have a downloadId
       if (data.downloadId) {
@@ -445,6 +456,8 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
     
     eventSource.onopen = () => {
       console.log("SSE connection opened");
+      // Progress: 50% after SSE connection opens
+      updateProgress(50, "Gathering Video Metadata...");
     };
     
     // Store the downloadId and video name for use in completion
@@ -496,14 +509,16 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
           
           // Show "Preparing Download..." until we have actual file sizes
           if (downloadedBytes === 0 && totalBytes === 0) {
-            updateProgress(progress, "Preparing Download...");
+            updateProgress(50, "Gathering Video Metadata...");
             setStatus("Preparing Download...");
           } else {
             // Download has actually started - set the flag
             if (!isDownloadStarted) {
               setIsDownloadStarted(true);
             }
-            updateProgress(progress, `Downloading: ${downloadedFormatted} / ${totalFormatted}`);
+            // Map the 0-100% download progress to 50-100% overall progress
+            const mappedProgress = 50 + (progress * 0.5);
+            updateProgress(mappedProgress, `Downloading: ${downloadedFormatted} / ${totalFormatted}`);
             setStatus(`Downloading: ${downloadedFormatted} / ${totalFormatted}`);
           }
           
