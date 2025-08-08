@@ -118,9 +118,26 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       });
 
       clearInterval(progressInterval);
-      updateProgress(100, "Upload complete!");
+
+      // Handle HTTP errors explicitly (e.g., 413 from reverse proxy)
+      if (!res.ok) {
+        if (res.status === 413) {
+          hideProgress();
+          showErrorPopup(
+            "❌ File Size Error",
+            "The server rejected the upload (413). Maximum allowed is 25MB. Please select a smaller file."
+          );
+          setStatus("File too large. Please select a file smaller than 25MB.");
+          return;
+        }
+        const errorText = await res.text().catch(() => "Upload failed");
+        hideProgress();
+        setStatus(`Upload failed: ${errorText}`);
+        return;
+      }
 
       const data = await res.json();
+      updateProgress(100, "Upload complete!");
       console.log("Upload response data:", data);
       setStatus(`Uploaded as: ${data.filename}`);
       
