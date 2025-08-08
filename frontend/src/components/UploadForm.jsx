@@ -679,7 +679,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
                   )}
                   <span className="text-sm text-gray-300">{progressText}</span>
                 </div>
-                <span className="text-sm text-gray-400">{progressValue}%</span>
+                <span className="text-sm text-gray-400">{Math.round(progressValue)}%</span>
               </div>
               
               <div className="w-full bg-gray-700 rounded-full h-3">
