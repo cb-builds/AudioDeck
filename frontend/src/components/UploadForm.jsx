@@ -522,10 +522,20 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
     const ws = new WebSocket(wsUrl);
     let wsOpened = false;
     let anyProgress = false;
-    const wsFallbackTimer = setTimeout(() => {
-      if (!wsOpened || !anyProgress) {
+    let fallbackTriggered = false;
+    
+    const triggerFallback = () => {
+      if (!fallbackTriggered) {
+        fallbackTriggered = true;
+        console.log('WebSocket failed, falling back to SSE');
         try { ws.close(); } catch (_) {}
         startSSE();
+      }
+    };
+    
+    const wsFallbackTimer = setTimeout(() => {
+      if (!wsOpened || !anyProgress) {
+        triggerFallback();
       }
     }, 1200);
 
@@ -582,10 +592,16 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       } catch (_) {}
     };
     ws.onerror = () => {
-      if (!anyProgress) startSSE();
+      console.log('WebSocket error detected');
+      triggerFallback();
     };
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       clearTimeout(wsFallbackTimer);
+      // If connection closed unexpectedly and no progress received, fallback
+      if (!anyProgress && !fallbackTriggered && event.code !== 1000) {
+        console.log('WebSocket closed unexpectedly, falling back to SSE');
+        triggerFallback();
+      }
     };
   };
 
