@@ -211,6 +211,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
   };
 
   const handleYoutubeDownload = async () => {
+    console.log("🔥🔥🔥 DOWNLOAD BUTTON CLICKED - JS IS RUNNING! 🔥🔥🔥");
     if (!ytUrl) return setStatus("Please enter a video URL.");
     
     console.log("=== Starting video download ===");
