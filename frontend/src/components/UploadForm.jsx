@@ -343,34 +343,14 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
             } else {
               videoName = "Twitter Post";
             }
-          } else if (ytUrl.includes('spotify.com/')) {
-            // Extract Spotify track/playlist information
-            if (ytUrl.includes('/track/')) {
-              const trackMatch = ytUrl.match(/spotify\.com\/track\/([a-zA-Z0-9]+)/);
-              if (trackMatch) {
-                const trackId = trackMatch[1];
-                videoName = `Spotify Track (${trackId})`;
-              } else {
-                videoName = "Spotify Track";
-              }
-            } else if (ytUrl.includes('/playlist/')) {
-              const playlistMatch = ytUrl.match(/spotify\.com\/playlist\/([a-zA-Z0-9]+)/);
-              if (playlistMatch) {
-                const playlistId = playlistMatch[1];
-                videoName = `Spotify Playlist (${playlistId})`;
-              } else {
-                videoName = "Spotify Playlist";
-              }
-            } else if (ytUrl.includes('/album/')) {
-              const albumMatch = ytUrl.match(/spotify\.com\/album\/([a-zA-Z0-9]+)/);
-              if (albumMatch) {
-                const albumId = albumMatch[1];
-                videoName = `Spotify Album (${albumId})`;
-              } else {
-                videoName = "Spotify Album";
-              }
+          } else if (ytUrl.includes('kick.com/')) {
+            // Extract Kick streamer information
+            const kickMatch = ytUrl.match(/kick\.com\/([^\/\?]+)/);
+            if (kickMatch) {
+              const streamer = kickMatch[1];
+              videoName = `Kick Stream (${streamer})`;
             } else {
-              videoName = "Spotify Audio";
+              videoName = "Kick Stream";
             }
           }
         }
@@ -424,36 +404,16 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
           } else {
             videoName = "Twitter Post";
           }
-        } else if (ytUrl.includes('spotify.com/')) {
-          // Extract Spotify track/playlist information
-          if (ytUrl.includes('/track/')) {
-            const trackMatch = ytUrl.match(/spotify\.com\/track\/([a-zA-Z0-9]+)/);
-            if (trackMatch) {
-              const trackId = trackMatch[1];
-              videoName = `Spotify Track (${trackId})`;
-            } else {
-              videoName = "Spotify Track";
-            }
-          } else if (ytUrl.includes('/playlist/')) {
-            const playlistMatch = ytUrl.match(/spotify\.com\/playlist\/([a-zA-Z0-9]+)/);
-            if (playlistMatch) {
-              const playlistId = playlistMatch[1];
-              videoName = `Spotify Playlist (${playlistId})`;
-            } else {
-              videoName = "Spotify Playlist";
-            }
-          } else if (ytUrl.includes('/album/')) {
-            const albumMatch = ytUrl.match(/spotify\.com\/album\/([a-zA-Z0-9]+)/);
-            if (albumMatch) {
-              const albumId = albumMatch[1];
-              videoName = `Spotify Album (${albumId})`;
-            } else {
-              videoName = "Spotify Album";
-            }
-          } else {
-            videoName = "Spotify Audio";
+                 } else if (ytUrl.includes('kick.com/')) {
+           // Extract Kick streamer information
+           const kickMatch = ytUrl.match(/kick\.com\/([^\/\?]+)/);
+           if (kickMatch) {
+             const streamer = kickMatch[1];
+             videoName = `Kick Stream (${streamer})`;
+           } else {
+             videoName = "Kick Stream";
+           }
           }
-        }
       }
       
       // Progress: 20% after title extraction

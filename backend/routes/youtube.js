@@ -289,10 +289,10 @@ router.get("/title", async (req, res) => {
       // Enhanced Twitter/X title extraction
       console.log("Extracting title for Twitter/X URL:", url);
       titleCmd = `yt-dlp -4 --get-title --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://twitter.com/" "${url}"`;
-    } else if (url.includes('spotify.com')) {
-      // Enhanced Spotify title extraction
-      console.log("Extracting title for Spotify URL:", url);
-      titleCmd = `yt-dlp -4 --get-title --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://open.spotify.com/" "${url}"`;
+    } else if (url.includes('kick.com')) {
+      // Enhanced Kick title extraction
+      console.log("Extracting title for Kick URL:", url);
+      titleCmd = `yt-dlp -4 --get-title --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://kick.com/" "${url}"`;
     } else {
       // Standard command for other platforms
       titleCmd = `yt-dlp -4 --get-title --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${url}"`;
@@ -361,34 +361,14 @@ router.get("/title", async (req, res) => {
           }
         }
         
-        // For Spotify, provide fallback naming
-        if (url.includes('spotify.com')) {
-          if (url.includes('/track/')) {
-            const trackMatch = url.match(/spotify\.com\/track\/([a-zA-Z0-9]+)/);
-            if (trackMatch) {
-              const trackId = trackMatch[1];
-              return res.json({ title: `Spotify Track (${trackId})` });
-            } else {
-              return res.json({ title: "Spotify Track" });
-            }
-          } else if (url.includes('/playlist/')) {
-            const playlistMatch = url.match(/spotify\.com\/playlist\/([a-zA-Z0-9]+)/);
-            if (playlistMatch) {
-              const playlistId = playlistMatch[1];
-              return res.json({ title: `Spotify Playlist (${playlistId})` });
-            } else {
-              return res.json({ title: "Spotify Playlist" });
-            }
-          } else if (url.includes('/album/')) {
-            const albumMatch = url.match(/spotify\.com\/album\/([a-zA-Z0-9]+)/);
-            if (albumMatch) {
-              const albumId = albumMatch[1];
-              return res.json({ title: `Spotify Album (${albumId})` });
-            } else {
-              return res.json({ title: "Spotify Album" });
-            }
+        // For Kick, provide fallback naming
+        if (url.includes('kick.com')) {
+          const kickMatch = url.match(/kick\.com\/([^\/\?]+)/);
+          if (kickMatch) {
+            const streamer = kickMatch[1];
+            return res.json({ title: `Kick Stream (${streamer})` });
           } else {
-            return res.json({ title: "Spotify Audio" });
+            return res.json({ title: "Kick Stream" });
           }
         }
         
@@ -449,8 +429,8 @@ router.post("/", (req, res) => {
     durationCmd = `yt-dlp -4 --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.twitch.tv/" --add-header "Client-Id:kimne78kx3ncx6brgo4mv6wki5h1ko" "${url}"`;
   } else if (url.includes('twitter.com') || url.includes('x.com')) {
     durationCmd = `yt-dlp -4 --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://twitter.com/" "${url}"`;
-  } else if (url.includes('spotify.com')) {
-    durationCmd = `yt-dlp -4 --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://open.spotify.com/" "${url}"`;
+  } else if (url.includes('kick.com')) {
+    durationCmd = `yt-dlp -4 --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://kick.com/" "${url}"`;
   } else {
     durationCmd = `yt-dlp -4 --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${url}"`;
   }
@@ -536,10 +516,10 @@ router.post("/", (req, res) => {
         // Special handling for Twitter/X with enhanced user agent and format selection
         console.log("Processing Twitter/X URL:", url);
         ytCmd = `yt-dlp -4 -f "bestaudio/best" --extract-audio --audio-format mp3 --no-playlist --no-warnings --no-progress --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://twitter.com/" -o "${outputPath}" "${url}"`;
-      } else if (url.includes('spotify.com')) {
-        // Special handling for Spotify with enhanced user agent and format selection
-        console.log("Processing Spotify URL:", url);
-        ytCmd = `yt-dlp -4 -f "bestaudio/best" --extract-audio --audio-format mp3 --no-playlist --no-warnings --no-progress --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://open.spotify.com/" -o "${outputPath}" "${url}"`;
+      } else if (url.includes('kick.com')) {
+        // Special handling for Kick with enhanced user agent and format selection
+        console.log("Processing Kick URL:", url);
+        ytCmd = `yt-dlp -4 -f "bestaudio/best" --extract-audio --audio-format mp3 --no-playlist --no-warnings --no-progress --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://kick.com/" -o "${outputPath}" "${url}"`;
       } else {
         // Standard command for other platforms
         ytCmd = `yt-dlp -4 -f bestaudio --extract-audio --audio-format mp3 --no-playlist --no-warnings --no-progress --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -o "${outputPath}" "${url}"`;
