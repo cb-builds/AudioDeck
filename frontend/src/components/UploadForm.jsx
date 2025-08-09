@@ -211,10 +211,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
   };
 
   const handleYoutubeDownload = async () => {
-    console.log("🔥🔥🔥 DOWNLOAD BUTTON CLICKED - JS IS RUNNING! 🔥🔥🔥");
     if (!ytUrl) return setStatus("Please enter a video URL.");
-    
-    console.log("=== Starting video download ===");
     setIsVideoUploading(true);
     setIsDownloadStarted(false); // Reset download started flag
     startProgress("Gathering Video Metadata...");
@@ -223,10 +220,8 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
     try {
       
       // First, check video duration
-      console.log("🕒 About to check video duration...");
       try {
         const durationRes = await fetchWithTimeout(`/api/youtube/duration?url=${encodeURIComponent(ytUrl)}`);
-        console.log("🕒 Duration response received:", durationRes.status);
         
         if (durationRes.ok) {
           const durationData = await durationRes.json();
@@ -271,11 +266,9 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       setProgressText("Gathering Video Metadata...");
       
       // Get video title before downloading
-      console.log("📝 About to get video title...");
       let videoName = "Imported Video";
       try {
         const titleRes = await fetchWithTimeout(`/api/youtube/title?url=${encodeURIComponent(ytUrl)}`);
-        console.log("📝 Title response received:", titleRes.status);
         
         if (titleRes.ok) {
           const titleData = await titleRes.json();
@@ -372,7 +365,6 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       // Store the video name in state for use in SSE handler
       setCurrentVideoName(videoName);
       
-      console.log("🚀 About to make /api/youtube POST request...");
       const res = await fetchWithTimeout("/api/youtube", {
         method: "POST",
         headers: {
@@ -383,7 +375,6 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
           name: "imported_video" // Add the required name parameter
         }),
       }, 30000); // 30 second timeout for the main download request
-      console.log("🚀 /api/youtube POST response received:", res.status);
       
       // Removed 30% tier at request stage
       
@@ -428,11 +419,8 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       
       // Start listening for progress updates if we have a downloadId
       if (data.downloadId) {
-        console.log("✅ Backend returned downloadId:", data.downloadId);
-        console.log("📞 About to call startProgressTracking...");
         startProgressTracking(data.downloadId, videoName);
       } else {
-        console.log("❌ No downloadId received from backend!");
         // Fallback to simulated progress
         updateProgress(75, "Processing audio...");
         setStatus("Processing audio...");
@@ -462,10 +450,8 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
   };
 
   const startProgressTracking = (downloadId, videoName) => {
-    console.log('🚀 startProgressTracking called with downloadId:', downloadId, 'videoName:', videoName);
     // Prevent duplicate trackers per downloadId
     if (activeSSEConnections.has(downloadId)) {
-      console.log('⚠️ Duplicate tracker prevented for downloadId:', downloadId);
       return;
     }
 
@@ -484,7 +470,6 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       es.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('SSE message received:', data);
           if (data.type === 'progress') {
             const progress = data.progress || 0;
             const downloadedBytes = data.downloadedBytes || 0;
@@ -568,7 +553,6 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'progress') {
-          console.log('WebSocket progress received:', data);
           anyProgress = true;
           const progress = data.progress || 0;
           const downloadedBytes = data.downloadedBytes || 0;
