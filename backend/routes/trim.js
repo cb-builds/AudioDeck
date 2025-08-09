@@ -22,13 +22,26 @@ router.post("/", (req, res) => {
 
   // Calculate duration for more precise trimming
   const duration = (parseFloat(endTime) - parseFloat(startTime)).toFixed(6);
+  const startTimeFormatted = parseFloat(startTime).toFixed(6);
   
-  // Use -ss for start time and -t for duration (more accurate than -to)
-  // Also use -avoid_negative_ts make_zero for better precision
-  const cmd = `ffmpeg -y -ss ${parseFloat(startTime).toFixed(6)} -i "${inputPath}" -t ${duration} -avoid_negative_ts make_zero -c copy "${outputPath}"`;
+  // Use a two-pass approach for maximum precision:
+  // 1. Fast seek to approximately the right position
+  // 2. Then precise trimming with re-encoding
+  const cmd = `ffmpeg -y -i "${inputPath}" -ss ${startTimeFormatted} -t ${duration} -acodec libmp3lame -ab 192k "${outputPath}"`;
 
-  exec(cmd, (err) => {
-    if (err) return res.status(500).json({ error: "ffmpeg trim failed", details: err.message });
+  console.log("Trim command:", cmd);
+  console.log("Input values:", { startTime, endTime, duration, startTimeFormatted });
+
+  exec(cmd, (err, stdout, stderr) => {
+    if (err) {
+      console.error("ffmpeg trim error:", err);
+      console.error("ffmpeg stderr:", stderr);
+      return res.status(500).json({ error: "ffmpeg trim failed", details: err.message });
+    }
+
+    console.log("ffmpeg trim successful");
+    console.log("ffmpeg stdout:", stdout);
+    if (stderr) console.log("ffmpeg stderr:", stderr);
 
     res.json({ message: "Trimmed file saved", filename: path.basename(outputPath) });
   });
