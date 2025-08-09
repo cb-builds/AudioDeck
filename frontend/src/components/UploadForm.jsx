@@ -421,9 +421,11 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       
       // Start listening for progress updates if we have a downloadId
       if (data.downloadId) {
-        console.log("Starting progress tracking for downloadId:", data.downloadId);
+        console.log("✅ Backend returned downloadId:", data.downloadId);
+        console.log("📞 About to call startProgressTracking...");
         startProgressTracking(data.downloadId, videoName);
       } else {
+        console.log("❌ No downloadId received from backend!");
         // Fallback to simulated progress
         updateProgress(75, "Processing audio...");
         setStatus("Processing audio...");
@@ -453,8 +455,10 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
   };
 
   const startProgressTracking = (downloadId, videoName) => {
+    console.log('🚀 startProgressTracking called with downloadId:', downloadId, 'videoName:', videoName);
     // Prevent duplicate trackers per downloadId
     if (activeSSEConnections.has(downloadId)) {
+      console.log('⚠️ Duplicate tracker prevented for downloadId:', downloadId);
       return;
     }
 
