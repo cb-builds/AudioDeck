@@ -251,6 +251,9 @@ router.get("/progress/:downloadId", (req, res) => {
         error: download.error,
         videoDuration: download.videoDuration
       };
+
+      // Send to SSE client
+      try { res.write(`data: ${JSON.stringify(progressData)}\n\n`); } catch (_) {}
       // Send over WebSocket
       broadcastProgress(downloadId, progressData);
 

@@ -453,37 +453,99 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
   };
 
   const startProgressTracking = (downloadId, videoName) => {
-    // Prevent duplicate connections per downloadId
+    // Prevent duplicate trackers per downloadId
     if (activeSSEConnections.has(downloadId)) {
       return;
     }
 
     setActiveSSEConnections(prev => new Set([...prev, downloadId]));
 
+    const startSSE = () => {
+      const es = new EventSource(`/api/youtube/progress/${downloadId}`);
+      es.onopen = () => {
+        animateProgressTo(30);
+        setProgressText("Preparing Download...");
+      };
+      let completionHandled = false;
+      let errorHandled = false;
+      es.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'progress') {
+            const progress = data.progress || 0;
+            const downloadedBytes = data.downloadedBytes || 0;
+            const totalBytes = data.totalBytes || 0;
+            const status = data.status || 'downloading';
+            if (status === 'error' && !errorHandled) {
+              errorHandled = true;
+              const errorMessage = data.error || 'Download failed';
+              hideProgress();
+              showErrorPopup("❌ Download Failed", errorMessage);
+              setStatus(`Download failed: ${errorMessage}`);
+              try { es.close(); } catch (_) {}
+              setActiveSSEConnections(prev => { const s=new Set(prev); s.delete(downloadId); return s; });
+              setIsVideoUploading(false);
+              return;
+            }
+            if (downloadedBytes === 0 && totalBytes === 0) {
+              setProgressText("Preparing Download...");
+              setStatus("Preparing Download...");
+            } else {
+              if (!isDownloadStarted) setIsDownloadStarted(true);
+              const mappedProgress = Math.min(100, 30 + (progress * 0.7));
+              animateProgressTo(mappedProgress);
+              setProgressText("Downloading...");
+              setStatus("Downloading...");
+            }
+            if ((progress >= 100 || status === 'complete') && !completionHandled && !errorHandled) {
+              completionHandled = true;
+              const filename = `${downloadId}_imported_video.mp3`;
+              const truncatedVideoName = truncateText(videoName, 50);
+              if (onFileUploaded) onFileUploaded(filename, truncatedVideoName, data.videoDuration);
+              setTimeout(() => {
+                hideProgress();
+                try { es.close(); } catch (_) {}
+                setActiveSSEConnections(prev => { const s=new Set(prev); s.delete(downloadId); return s; });
+              }, 2000);
+            }
+          }
+        } catch (_) {}
+      };
+      es.onerror = () => {
+        try { es.close(); } catch (_) {}
+      };
+    };
+
+    // Try WebSocket first
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const wsUrl = `${protocol}://${window.location.host}/ws?downloadId=${downloadId}`;
     const ws = new WebSocket(wsUrl);
+    let wsOpened = false;
+    let anyProgress = false;
+    const wsFallbackTimer = setTimeout(() => {
+      if (!wsOpened || !anyProgress) {
+        try { ws.close(); } catch (_) {}
+        startSSE();
+      }
+    }, 1200);
 
     ws.onopen = () => {
-      // Progress: 30% after connection opens
+      wsOpened = true;
       animateProgressTo(30);
       setProgressText("Preparing Download...");
     };
 
-    let currentDownloadId = downloadId;
-    let currentVideoName = videoName;
     let completionHandled = false;
     let errorHandled = false;
-
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'progress') {
+          anyProgress = true;
           const progress = data.progress || 0;
           const downloadedBytes = data.downloadedBytes || 0;
           const totalBytes = data.totalBytes || 0;
           const status = data.status || 'downloading';
-
           if (status === 'error' && !errorHandled) {
             errorHandled = true;
             const errorMessage = data.error || 'Download failed';
@@ -491,15 +553,10 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
             showErrorPopup("❌ Download Failed", errorMessage);
             setStatus(`Download failed: ${errorMessage}`);
             try { ws.close(); } catch (_) {}
-            setActiveSSEConnections(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(currentDownloadId);
-              return newSet;
-            });
+            setActiveSSEConnections(prev => { const s=new Set(prev); s.delete(downloadId); return s; });
             setIsVideoUploading(false);
             return;
           }
-
           if (downloadedBytes === 0 && totalBytes === 0) {
             setProgressText("Preparing Download...");
             setStatus("Preparing Download...");
@@ -510,38 +567,26 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
             setProgressText("Downloading...");
             setStatus("Downloading...");
           }
-
           if ((progress >= 100 || status === 'complete') && !completionHandled && !errorHandled) {
             completionHandled = true;
-            const filename = `${currentDownloadId}_imported_video.mp3`;
-            const truncatedVideoName = truncateText(currentVideoName, 50);
-            if (onFileUploaded) {
-              onFileUploaded(filename, truncatedVideoName, data.videoDuration);
-            }
+            const filename = `${downloadId}_imported_video.mp3`;
+            const truncatedVideoName = truncateText(videoName, 50);
+            if (onFileUploaded) onFileUploaded(filename, truncatedVideoName, data.videoDuration);
             setTimeout(() => {
               hideProgress();
               try { ws.close(); } catch (_) {}
-              setActiveSSEConnections(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(currentDownloadId);
-                return newSet;
-              });
+              setActiveSSEConnections(prev => { const s=new Set(prev); s.delete(downloadId); return s; });
             }, 2000);
           }
         }
-      } catch (e) {
-        // Ignore parse errors
-      }
+      } catch (_) {}
     };
-
     ws.onerror = () => {
-      // Keep silent; UI will continue if messages resume or completion triggers
+      if (!anyProgress) startSSE();
     };
-
-    // Safety close after 30s
-    setTimeout(() => {
-      try { ws.close(); } catch (_) {}
-    }, 30000);
+    ws.onclose = () => {
+      clearTimeout(wsFallbackTimer);
+    };
   };
 
   const triggerFileSelect = () => {
