@@ -34,13 +34,13 @@ router.post("/", (req, res) => {
 
   const originalFilename = file.name;
   const isVideo = isVideoFile(originalFilename);
-  const filename = `${Date.now()}_${path.parse(originalFilename).name}.mp3`;
+  const timestamp = Date.now();
+  const filename = `${timestamp}_${path.parse(originalFilename).name}.mp3`;
   const savePath = path.join(CLIPS_DIR, filename);
+  const tempFilePath = path.join(CLIPS_DIR, `${timestamp}_original_${originalFilename}`);
 
-  file.mv(path.join(CLIPS_DIR, `${Date.now()}_original_${originalFilename}`), err => {
+  file.mv(tempFilePath, err => {
     if (err) return res.status(500).send(err);
-    
-    const tempFilePath = path.join(CLIPS_DIR, `${Date.now()}_original_${originalFilename}`);
     
     if (isVideo) {
       console.log("Video file detected, extracting audio...");
