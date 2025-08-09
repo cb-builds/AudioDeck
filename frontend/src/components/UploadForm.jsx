@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { truncateText } from "../utils/textUtils";
 
 const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
@@ -18,6 +18,88 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
   const [activeSSEConnections, setActiveSSEConnections] = useState(new Set());
   const [isDownloadStarted, setIsDownloadStarted] = useState(false);
 
+  const progressAnimRef = useRef(null);
+  const targetProgressRef = useRef(0);
+  const currentProgressRef = useRef(0);
+
+  const PROGRESS_TICK_MS = 120; // tick for visible number-by-number
+  const PROGRESS_STEP_PERCENT = 1.5; // ~3x faster than 0.5% per tick
+
+  const clearProgressTimer = () => {
+    if (progressAnimRef.current) {
+      clearInterval(progressAnimRef.current);
+      progressAnimRef.current = null;
+    }
+  };
+
+  const animateProgressTo = (target) => {
+    targetProgressRef.current = Math.max(0, Math.min(100, target));
+    // Restart timer to head toward new target
+    clearProgressTimer();
+
+    const current = currentProgressRef.current;
+    const desired = targetProgressRef.current;
+    const distance = Math.abs(desired - current);
+    
+    // If distance is very small, just jump immediately
+    if (distance <= 1) {
+      currentProgressRef.current = desired;
+      updateProgress(Math.round(desired));
+      return;
+    }
+    
+    // Calculate dynamic step size to maintain consistent animation duration
+    // Base duration: 10% jump should take ~8 ticks (10 / 1.5 * 120ms = ~800ms)
+    const baseDistance = 10;
+    const baseDuration = (baseDistance / PROGRESS_STEP_PERCENT) * PROGRESS_TICK_MS; // ~800ms
+    
+    // Calculate step size to make this distance take the same duration
+    const totalTicks = baseDuration / PROGRESS_TICK_MS; // ~6.67 ticks
+    const stepSize = distance / totalTicks;
+
+    progressAnimRef.current = setInterval(() => {
+      const current = currentProgressRef.current;
+      const desired = targetProgressRef.current;
+      if (Math.abs(desired - current) <= stepSize) {
+        currentProgressRef.current = desired;
+        updateProgress(Math.round(desired));
+        clearProgressTimer();
+        return;
+      }
+      const dir = desired > current ? 1 : -1;
+      const next = current + dir * stepSize;
+      currentProgressRef.current = next;
+      updateProgress(Math.round(next));
+    }, PROGRESS_TICK_MS);
+  };
+
+  // Helper to add a timeout to fetch requests
+  const fetchWithTimeout = (url, options = {}, timeoutMs = 10000) => {
+    return new Promise((resolve, reject) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+        // Map timeout to the existing backend error message for consistency
+        reject(new Error('Output file not found. Please check link and try again.'));
+      }, timeoutMs);
+
+      fetch(url, { ...options, signal: controller.signal })
+        .then((res) => {
+          clearTimeout(timeoutId);
+          resolve(res);
+        })
+        .catch((err) => {
+          clearTimeout(timeoutId);
+          if (err.name === 'AbortError') {
+            // Ensure consistent error message on timeout
+            reject(new Error('Output file not found. Please check link and try again.'));
+          } else {
+            reject(err);
+          }
+        });
+    });
+  };
+
   const showErrorPopup = (title, message) => {
     setPopupTitle(title);
     setPopupMessage(message);
@@ -25,23 +107,24 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
   };
 
   const startProgress = (text) => {
-    console.log("startProgress called with:", text);
     setShowProgress(true);
     setProgressValue(0);
     setProgressText(text);
+    currentProgressRef.current = 0;
+    targetProgressRef.current = 0;
+    clearProgressTimer();
   };
 
   const updateProgress = (value, text) => {
-    console.log("updateProgress called with:", value, text);
     setProgressValue(value);
     if (text) setProgressText(text);
   };
 
   const hideProgress = () => {
-    console.log("hideProgress called");
     setShowProgress(false);
     setProgressValue(0);
     setProgressText("");
+    clearProgressTimer();
     if (onDownloadComplete) {
       onDownloadComplete();
     }
@@ -50,6 +133,22 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
+      // Check file type (audio/video only)
+      const allowedTypes = [
+        'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/m4a', 'audio/aac', 'audio/ogg', 'audio/flac',
+        'video/mp4', 'video/webm', 'video/ogg', 'video/avi', 'video/mov', 'video/wmv', 'video/flv',
+        'audio/x-m4a', 'audio/mp4', 'video/x-msvideo', 'video/quicktime'
+      ];
+      
+      if (!allowedTypes.includes(selectedFile.type)) {
+        showErrorPopup(
+          "❌ Unsupported File Type",
+          `The file you selected is not a supported audio or video format.\n\nFile type: ${selectedFile.type || 'Unknown'}\n\nPlease select an audio or video file (MP3, WAV, M4A, MP4, etc.).`
+        );
+        setStatus("Unsupported file type. Please select an audio or video file.");
+        return;
+      }
+      
       // Check file size (25MB limit)
       const maxSize = 25 * 1024 * 1024; // 25MB in bytes
       if (selectedFile.size > maxSize) {
@@ -85,15 +184,32 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
         });
       }, 200);
 
-      const res = await fetch("/api/upload", {
+      const res = await fetchWithTimeout("/api/upload", {
         method: "POST",
         body: formData,
       });
 
       clearInterval(progressInterval);
-      updateProgress(100, "Upload complete!");
+
+      // Handle HTTP errors explicitly (e.g., 413 from reverse proxy)
+      if (!res.ok) {
+        if (res.status === 413) {
+          hideProgress();
+          showErrorPopup(
+            "❌ File Size Error",
+            "The server rejected the upload (413). Maximum allowed is 25MB. Please select a smaller file."
+          );
+          setStatus("File too large. Please select a file smaller than 25MB.");
+          return;
+        }
+        const errorText = await res.text().catch(() => "Upload failed");
+        hideProgress();
+        setStatus(`Upload failed: ${errorText}`);
+        return;
+      }
 
       const data = await res.json();
+      updateProgress(100, "Upload complete!");
       console.log("Upload response data:", data);
       setStatus(`Uploaded as: ${data.filename}`);
       
@@ -116,33 +232,25 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
 
   const handleYoutubeDownload = async () => {
     if (!ytUrl) return setStatus("Please enter a video URL.");
-    
-    console.log("=== Starting video download ===");
     setIsVideoUploading(true);
     setIsDownloadStarted(false); // Reset download started flag
     startProgress("Gathering Video Metadata...");
     setStatus("Gathering Video Metadata...");
     
     try {
-      console.log("Starting video download for URL:", ytUrl);
       
       // First, check video duration
-      console.log("Checking video duration...");
       try {
-        console.log("Making duration request to:", `/api/youtube/duration?url=${encodeURIComponent(ytUrl)}`);
-        const durationRes = await fetch(`/api/youtube/duration?url=${encodeURIComponent(ytUrl)}`);
-        console.log("Duration response status:", durationRes.status);
+        const durationRes = await fetchWithTimeout(`/api/youtube/duration?url=${encodeURIComponent(ytUrl)}`);
         
         if (durationRes.ok) {
           const durationData = await durationRes.json();
-          console.log("Duration data:", durationData);
           
           if (durationData.isTooLong) {
             const minutes = Math.floor(durationData.duration / 60);
             const seconds = durationData.duration % 60;
             const durationFormatted = `${minutes}:${seconds.toString().padStart(2, '0')}`;
             
-            console.log("Video too long, showing popup and stopping download");
             hideProgress();
             showErrorPopup(
               "❌ Video Too Long",
@@ -151,35 +259,41 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
             setStatus("Video too long. Please try a shorter video.");
             setIsVideoUploading(false);
             return;
-          } else {
-            console.log("Duration check passed, video is within limit");
           }
         } else {
-          console.log("Duration response not ok, status:", durationRes.status);
           const errorText = await durationRes.text();
-          console.log("Duration error response:", errorText);
+          hideProgress();
+          const message = 'Output file not found. Please check link and try again.';
+          showErrorPopup("❌ Download Failed", message);
+          setStatus(`Download failed: ${message}`);
+          setIsVideoUploading(false);
+          return;
         }
       } catch (durationError) {
-        console.log("Duration check failed with error:", durationError);
-        // Don't hide progress here - let the download continue
+        // Fail fast on duration errors/timeouts and stop further API calls
+        hideProgress();
+        const message = (durationError && typeof durationError.message === 'string' && durationError.message.includes('Output file not found'))
+          ? durationError.message
+          : 'Output file not found. Please check link and try again.';
+        showErrorPopup("❌ Download Failed", message);
+        setStatus(`Download failed: ${message}`);
+        setIsVideoUploading(false);
+        return;
       }
       
-      console.log("Proceeding to download phase...");
-      startProgress("Gathering Video Metadata...");
-      setStatus("Gathering Video Metadata...");
+      // Progress: 10% after duration check
+      animateProgressTo(10);
+      setProgressText("Gathering Video Metadata...");
       
       // Get video title before downloading
       let videoName = "Imported Video";
       try {
-        console.log("Getting video title...");
-        const titleRes = await fetch(`/api/youtube/title?url=${encodeURIComponent(ytUrl)}`);
+        const titleRes = await fetchWithTimeout(`/api/youtube/title?url=${encodeURIComponent(ytUrl)}`);
         
         if (titleRes.ok) {
           const titleData = await titleRes.json();
           videoName = titleData.title || "Imported Video";
-          console.log("Got video title:", videoName);
         } else {
-          console.log("Could not get video title, using fallback");
           // Fallback to platform-specific naming
           if (ytUrl.includes('youtube.com/') || ytUrl.includes('youtu.be/')) {
             const videoId = ytUrl.includes('v=') ? ytUrl.split('v=')[1]?.split('&')[0] : 
@@ -222,7 +336,6 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
           }
         }
       } catch (titleError) {
-        console.log("Title extraction failed, using fallback:", titleError);
         // Same fallback logic as above
         if (ytUrl.includes('youtube.com/') || ytUrl.includes('youtu.be/')) {
           const videoId = ytUrl.includes('v=') ? ytUrl.split('v=')[1]?.split('&')[0] : 
@@ -265,11 +378,14 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
         }
       }
       
+      // Progress: 20% after title extraction
+      animateProgressTo(20);
+      setProgressText("Gathering Video Metadata...");
+      
       // Store the video name in state for use in SSE handler
       setCurrentVideoName(videoName);
       
-      console.log("Making download request to /api/youtube");
-      const res = await fetch("/api/youtube", {
+      const res = await fetchWithTimeout("/api/youtube", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -278,9 +394,9 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
           url: ytUrl,
           name: "imported_video" // Add the required name parameter
         }),
-      });
+      }, 30000); // 30 second timeout for the main download request
       
-      console.log("Download response status:", res.status);
+      // Removed 30% tier at request stage
       
       if (!res.ok) {
         const errorData = await res.json();
@@ -318,13 +434,11 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       }
       
       const data = await res.json();
-      console.log("Download started:", data);
-      console.log("Received videoDuration:", data.videoDuration);
-      console.log("Full response data:", JSON.stringify(data, null, 2));
+      
+      // Removed 40% tier at response stage
       
       // Start listening for progress updates if we have a downloadId
       if (data.downloadId) {
-        console.log("Starting progress tracking for downloadId:", data.downloadId);
         startProgressTracking(data.downloadId, videoName);
       } else {
         // Fallback to simulated progress
@@ -343,133 +457,193 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
     } catch (err) {
       console.error("Video upload error:", err);
       hideProgress();
-      setStatus(`Video upload failed: ${err.message}`);
+      // If this was a timeout, surface the known error to the user consistently
+      if (err && typeof err.message === 'string' && err.message.includes('Output file not found')) {
+        showErrorPopup("❌ Download Failed", err.message);
+        setStatus(`Download failed: ${err.message}`);
+      } else {
+        setStatus(`Video upload failed: ${err.message}`);
+      }
     } finally {
       setIsVideoUploading(false);
     }
   };
 
   const startProgressTracking = (downloadId, videoName) => {
-    console.log("Starting SSE connection for progress tracking");
-    
-    // Check if we already have an active connection for this downloadId
+    // Prevent duplicate trackers per downloadId
     if (activeSSEConnections.has(downloadId)) {
-      console.log("SSE connection already exists for downloadId:", downloadId);
       return;
     }
-    
-    // Add this connection to the active set
+
     setActiveSSEConnections(prev => new Set([...prev, downloadId]));
+
+    const startSSE = () => {
+      console.log(`Starting SSE connection to: /api/youtube/progress/${downloadId}`);
+      const es = new EventSource(`/api/youtube/progress/${downloadId}`);
+      es.onopen = () => {
+        console.log('SSE connection opened successfully');
+        animateProgressTo(30);
+        setProgressText("Preparing Download...");
+      };
+      let completionHandled = false;
+      let errorHandled = false;
+      let lastLoggedProgressSSE = -1;
+      es.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'progress') {
+            // Only log progress changes in 10% increments or status changes
+            const progress = data.progress || 0;
+            const status = data.status || 'downloading';
+            if (Math.floor(progress / 10) > Math.floor(lastLoggedProgressSSE / 10) || 
+                status !== 'downloading' || 
+                lastLoggedProgressSSE === -1) {
+              console.log(`SSE progress: ${Math.round(progress)}% (${status})`);
+              lastLoggedProgressSSE = progress;
+            }
+            
+            const downloadedBytes = data.downloadedBytes || 0;
+            const totalBytes = data.totalBytes || 0;
+            if (status === 'error' && !errorHandled) {
+              errorHandled = true;
+              const errorMessage = data.error || 'Download failed';
+              hideProgress();
+              showErrorPopup("❌ Download Failed", errorMessage);
+              setStatus(`Download failed: ${errorMessage}`);
+              try { es.close(); } catch (_) {}
+              setActiveSSEConnections(prev => { const s=new Set(prev); s.delete(downloadId); return s; });
+              setIsVideoUploading(false);
+              return;
+            }
+            if (downloadedBytes === 0 && totalBytes === 0) {
+              setProgressText("Preparing Download...");
+              setStatus("Preparing Download...");
+            } else {
+              if (!isDownloadStarted) setIsDownloadStarted(true);
+              const mappedProgress = Math.min(100, 30 + (progress * 0.7));
+              animateProgressTo(mappedProgress);
+              setProgressText("Downloading...");
+              setStatus("Downloading...");
+            }
+            if ((progress >= 100 || status === 'complete') && !completionHandled && !errorHandled) {
+              completionHandled = true;
+              const filename = `${downloadId}_imported_video.mp3`;
+              const truncatedVideoName = truncateText(videoName, 50);
+              if (onFileUploaded) onFileUploaded(filename, truncatedVideoName, data.videoDuration);
+              setTimeout(() => {
+                hideProgress();
+                try { es.close(); } catch (_) {}
+                setActiveSSEConnections(prev => { const s=new Set(prev); s.delete(downloadId); return s; });
+              }, 2000);
+            }
+          }
+        } catch (_) {}
+      };
+      es.onerror = (error) => {
+        console.log('SSE connection error:', error);
+        try { es.close(); } catch (_) {}
+      };
+    };
+
+    // Try WebSocket first
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const wsUrl = `${protocol}://${window.location.host}/ws?downloadId=${downloadId}`;
+    console.log(`Attempting WebSocket connection to: ${wsUrl}`);
+    const ws = new WebSocket(wsUrl);
+    let wsOpened = false;
+    let anyProgress = false;
+    let fallbackTriggered = false;
     
-    const eventSource = new EventSource(`/api/youtube/progress/${downloadId}`);
-    
-    eventSource.onopen = () => {
-      console.log(`SSE connection opened for downloadId: ${downloadId}`);
+    const triggerFallback = () => {
+      if (!fallbackTriggered) {
+        fallbackTriggered = true;
+        console.log('WebSocket failed, falling back to SSE');
+        try { ws.close(); } catch (_) {}
+        startSSE();
+      }
     };
     
-    // Store the downloadId and video name for use in completion
-    let currentDownloadId = downloadId;
-    let currentVideoName = videoName;
-    let completionHandled = false; // Flag to prevent multiple completion calls
-    let errorHandled = false; // Flag to prevent multiple error popups
-    
-    eventSource.onmessage = (event) => {
+    const wsFallbackTimer = setTimeout(() => {
+      if (!wsOpened || !anyProgress) {
+        triggerFallback();
+      }
+    }, 1200);
+
+    ws.onopen = () => {
+      console.log('WebSocket connection opened successfully');
+      wsOpened = true;
+      animateProgressTo(30);
+      setProgressText("Preparing Download...");
+    };
+
+    let completionHandled = false;
+    let errorHandled = false;
+    let lastLoggedProgress = -1;
+    ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log("SSE Progress update received:", data);
-        
         if (data.type === 'progress') {
+          anyProgress = true;
+          
+          // Only log progress changes in 10% increments or status changes
           const progress = data.progress || 0;
+          const status = data.status || 'downloading';
+          if (Math.floor(progress / 10) > Math.floor(lastLoggedProgress / 10) || 
+              status !== 'downloading' || 
+              lastLoggedProgress === -1) {
+            console.log(`WebSocket progress: ${Math.round(progress)}% (${status})`);
+            lastLoggedProgress = progress;
+          }
+          
           const downloadedBytes = data.downloadedBytes || 0;
           const totalBytes = data.totalBytes || 0;
-          const status = data.status || 'downloading';
-          
-          // Format bytes for display
-          const formatBytes = (bytes) => {
-            if (bytes === 0) return '0 B';
-            const k = 1024;
-            const sizes = ['B', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-          };
-          
-          const downloadedFormatted = formatBytes(downloadedBytes);
-          const totalFormatted = formatBytes(totalBytes);
-          
-          // Check for error status
           if (status === 'error' && !errorHandled) {
-            errorHandled = true; // Mark as handled to prevent duplicate popups
+            errorHandled = true;
             const errorMessage = data.error || 'Download failed';
             hideProgress();
             showErrorPopup("❌ Download Failed", errorMessage);
             setStatus(`Download failed: ${errorMessage}`);
-            eventSource.close(); // Close SSE connection immediately
-            // Remove from active connections
-            setActiveSSEConnections(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(currentDownloadId);
-              return newSet;
-            });
-            setIsVideoUploading(false); // Reset upload state
+            try { ws.close(); } catch (_) {}
+            setActiveSSEConnections(prev => { const s=new Set(prev); s.delete(downloadId); return s; });
+            setIsVideoUploading(false);
             return;
           }
-          
-          // Show "Preparing Download..." until we have actual file sizes
           if (downloadedBytes === 0 && totalBytes === 0) {
-            updateProgress(progress, "Preparing Download...");
+            setProgressText("Preparing Download...");
             setStatus("Preparing Download...");
           } else {
-            // Download has actually started - set the flag
-            if (!isDownloadStarted) {
-              setIsDownloadStarted(true);
-            }
-            updateProgress(progress, `Downloading: ${downloadedFormatted} / ${totalFormatted}`);
-            setStatus(`Downloading: ${downloadedFormatted} / ${totalFormatted}`);
+            if (!isDownloadStarted) setIsDownloadStarted(true);
+            const mappedProgress = Math.min(100, 30 + (progress * 0.7));
+            animateProgressTo(mappedProgress);
+            setProgressText("Downloading...");
+            setStatus("Downloading...");
           }
-          
-          // If progress is 100% or status is complete, handle completion
           if ((progress >= 100 || status === 'complete') && !completionHandled && !errorHandled) {
-            completionHandled = true; // Mark as handled to prevent duplicate calls
-            console.log(`Download completion detected for ${currentDownloadId}. Progress: ${progress}%, Status: ${status}`);
-            
-            // Extract filename from downloadId (assuming format: downloadId_imported_video.mp3)
-            const filename = `${currentDownloadId}_imported_video.mp3`;
-            const truncatedVideoName = truncateText(currentVideoName, 50);
-            
-            console.log(`Notifying parent component with filename: ${filename}`);
-            
-            // Notify parent component about the uploaded file
-            if (onFileUploaded) {
-              onFileUploaded(filename, truncatedVideoName, data.videoDuration);
-            }
-            
+            completionHandled = true;
+            const filename = `${downloadId}_imported_video.mp3`;
+            const truncatedVideoName = truncateText(videoName, 50);
+            if (onFileUploaded) onFileUploaded(filename, truncatedVideoName, data.videoDuration);
             setTimeout(() => {
-              console.log(`Hiding progress and closing SSE connection for ${currentDownloadId}`);
               hideProgress();
-              eventSource.close(); // Close SSE connection after completion
-              // Remove from active connections
-              setActiveSSEConnections(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(currentDownloadId);
-                return newSet;
-              });
+              try { ws.close(); } catch (_) {}
+              setActiveSSEConnections(prev => { const s=new Set(prev); s.delete(downloadId); return s; });
             }, 2000);
           }
         }
-      } catch (error) {
-        console.error("Error parsing SSE data:", error);
+      } catch (_) {}
+    };
+    ws.onerror = () => {
+      console.log('WebSocket error detected');
+      triggerFallback();
+    };
+    ws.onclose = (event) => {
+      clearTimeout(wsFallbackTimer);
+      // If connection closed unexpectedly and no progress received, fallback
+      if (!anyProgress && !fallbackTriggered && event.code !== 1000) {
+        console.log('WebSocket closed unexpectedly, falling back to SSE');
+        triggerFallback();
       }
     };
-    
-    eventSource.onerror = (error) => {
-      console.error(`SSE error for downloadId ${downloadId}:`, error);
-      eventSource.close();
-    };
-    
-    // Close connection after completion
-    setTimeout(() => {
-      eventSource.close();
-    }, 30000); // Close after 30 seconds
   };
 
   const triggerFileSelect = () => {
@@ -514,7 +688,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
           >
             <input
               type="file"
-              accept="audio/*"
+              accept=".mp3,.wav,.m4a,.aac,.ogg,.flac,.mp4,.webm,.avi,.mov,.wmv,.flv,.mkv"
               onChange={handleFileChange}
               className="hidden"
               id="file-upload"
@@ -636,7 +810,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
                   )}
                   <span className="text-sm text-gray-300">{progressText}</span>
                 </div>
-                <span className="text-sm text-gray-400">{progressValue}%</span>
+                <span className="text-sm text-gray-400">{Math.round(progressValue)}%</span>
               </div>
               
               <div className="w-full bg-gray-700 rounded-full h-3">
