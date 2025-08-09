@@ -9,8 +9,8 @@ services:
     ports:
       - "4040:4000"
     volumes:
-      - audiodeck_clips:/app/backend/clips
-      - audiodeck_logs:/app/logs
+      - audiodeck_clips_dev:/app/backend/clips
+      - audiodeck_logs_dev:/app/logs
     environment:
       - NODE_ENV=development
       - PORT=4000
@@ -28,7 +28,7 @@ services:
       start_period: 40s
 
 volumes:
-  audiodeck_clips:
+  audiodeck_clips_dev:
     driver: local
-  audiodeck_logs:
+  audiodeck_logs_dev:
     driver: local 
