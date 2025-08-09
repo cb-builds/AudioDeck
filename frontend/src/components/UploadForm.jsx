@@ -461,8 +461,10 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
     setActiveSSEConnections(prev => new Set([...prev, downloadId]));
 
     const startSSE = () => {
+      console.log(`Starting SSE connection to: /api/youtube/progress/${downloadId}`);
       const es = new EventSource(`/api/youtube/progress/${downloadId}`);
       es.onopen = () => {
+        console.log('SSE connection opened successfully');
         animateProgressTo(30);
         setProgressText("Preparing Download...");
       };
@@ -471,6 +473,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       es.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          console.log('SSE message received:', data);
           if (data.type === 'progress') {
             const progress = data.progress || 0;
             const downloadedBytes = data.downloadedBytes || 0;
@@ -511,7 +514,8 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
           }
         } catch (_) {}
       };
-      es.onerror = () => {
+      es.onerror = (error) => {
+        console.log('SSE connection error:', error);
         try { es.close(); } catch (_) {}
       };
     };
@@ -519,6 +523,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
     // Try WebSocket first
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const wsUrl = `${protocol}://${window.location.host}/ws?downloadId=${downloadId}`;
+    console.log(`Attempting WebSocket connection to: ${wsUrl}`);
     const ws = new WebSocket(wsUrl);
     let wsOpened = false;
     let anyProgress = false;
@@ -540,6 +545,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
     }, 1200);
 
     ws.onopen = () => {
+      console.log('WebSocket connection opened successfully');
       wsOpened = true;
       animateProgressTo(30);
       setProgressText("Preparing Download...");
@@ -551,6 +557,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'progress') {
+          console.log('WebSocket progress received:', data);
           anyProgress = true;
           const progress = data.progress || 0;
           const downloadedBytes = data.downloadedBytes || 0;
