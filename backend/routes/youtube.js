@@ -189,11 +189,11 @@ router.get("/duration", async (req, res) => {
   const { url } = req.query;
 
   if (!url) {
-    return res.status(400).json({ error: "Missing video URL." });
+    return res.status(400).json({ error: "Missing audio/video URL." });
   }
 
   try {
-    // Use yt-dlp to get video duration
+    // Use yt-dlp to get audio/video duration
     let durationCmd;
     if (url.includes('twitch.tv')) {
       // Enhanced Twitch duration extraction with proper headers
@@ -267,11 +267,11 @@ router.get("/title", async (req, res) => {
   const { url } = req.query;
 
   if (!url) {
-    return res.status(400).json({ error: "Missing video URL." });
+    return res.status(400).json({ error: "Missing audio/video URL." });
   }
 
   try {
-    // Use yt-dlp to get video title with better TikTok and Twitch support
+    // Use yt-dlp to get audio/video title with better TikTok and Twitch support
     let titleCmd;
     if (url.includes('twitch.tv')) {
       // Enhanced Twitch title extraction with proper headers
@@ -285,6 +285,14 @@ router.get("/title", async (req, res) => {
         console.log("Processing Twitch stream/VOD for title extraction");
         titleCmd = `yt-dlp -4 --get-title --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.twitch.tv/" --add-header "Client-Id:kimne78kx3ncx6brgo4mv6wki5h1ko" "${url}"`;
       }
+    } else if (url.includes('twitter.com') || url.includes('x.com')) {
+      // Enhanced Twitter/X title extraction
+      console.log("Extracting title for Twitter/X URL:", url);
+      titleCmd = `yt-dlp -4 --get-title --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://twitter.com/" "${url}"`;
+    } else if (url.includes('spotify.com')) {
+      // Enhanced Spotify title extraction
+      console.log("Extracting title for Spotify URL:", url);
+      titleCmd = `yt-dlp -4 --get-title --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://open.spotify.com/" "${url}"`;
     } else {
       // Standard command for other platforms
       titleCmd = `yt-dlp -4 --get-title --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${url}"`;
@@ -341,12 +349,55 @@ router.get("/title", async (req, res) => {
            }
         }
         
-        return res.status(500).json({ error: "Could not extract video title", details: err.message });
+        // For Twitter/X, provide fallback naming
+        if (url.includes('twitter.com') || url.includes('x.com')) {
+          const twitterMatch = url.match(/(?:twitter\.com|x\.com)\/([^\/]+)\/status\/(\d+)/);
+          if (twitterMatch) {
+            const username = twitterMatch[1];
+            const tweetId = twitterMatch[2];
+            return res.json({ title: `Twitter Post (${username} - ${tweetId})` });
+          } else {
+            return res.json({ title: "Twitter Post" });
+          }
+        }
+        
+        // For Spotify, provide fallback naming
+        if (url.includes('spotify.com')) {
+          if (url.includes('/track/')) {
+            const trackMatch = url.match(/spotify\.com\/track\/([a-zA-Z0-9]+)/);
+            if (trackMatch) {
+              const trackId = trackMatch[1];
+              return res.json({ title: `Spotify Track (${trackId})` });
+            } else {
+              return res.json({ title: "Spotify Track" });
+            }
+          } else if (url.includes('/playlist/')) {
+            const playlistMatch = url.match(/spotify\.com\/playlist\/([a-zA-Z0-9]+)/);
+            if (playlistMatch) {
+              const playlistId = playlistMatch[1];
+              return res.json({ title: `Spotify Playlist (${playlistId})` });
+            } else {
+              return res.json({ title: "Spotify Playlist" });
+            }
+          } else if (url.includes('/album/')) {
+            const albumMatch = url.match(/spotify\.com\/album\/([a-zA-Z0-9]+)/);
+            if (albumMatch) {
+              const albumId = albumMatch[1];
+              return res.json({ title: `Spotify Album (${albumId})` });
+            } else {
+              return res.json({ title: "Spotify Album" });
+            }
+          } else {
+            return res.json({ title: "Spotify Audio" });
+          }
+        }
+        
+        return res.status(500).json({ error: "Could not extract audio/video title", details: err.message });
       }
 
       const title = stdout.trim();
       if (!title) {
-        return res.status(404).json({ error: "No title found for this video" });
+        return res.status(404).json({ error: "No title found for this audio/video" });
       }
 
       // Truncate title if it's too long
@@ -356,7 +407,7 @@ router.get("/title", async (req, res) => {
     });
   } catch (error) {
     console.error("Title extraction failed:", error);
-    res.status(500).json({ error: "Title extraction failed", details: error.message });
+    res.status(500).json({ error: "Audio/video title extraction failed", details: error.message });
   }
 });
 
@@ -367,7 +418,7 @@ router.post("/", (req, res) => {
   console.log("POST /api/youtube called with:", { url, name });
 
   if (!url || !name) {
-    return res.status(400).json({ error: "Missing video URL or desired name." });
+    return res.status(400).json({ error: "Missing audio/video URL or desired name." });
   }
 
   const downloadId = Date.now().toString();
@@ -396,6 +447,10 @@ router.post("/", (req, res) => {
   let durationCmd;
   if (url.includes('twitch.tv')) {
     durationCmd = `yt-dlp -4 --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.twitch.tv/" --add-header "Client-Id:kimne78kx3ncx6brgo4mv6wki5h1ko" "${url}"`;
+  } else if (url.includes('twitter.com') || url.includes('x.com')) {
+    durationCmd = `yt-dlp -4 --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://twitter.com/" "${url}"`;
+  } else if (url.includes('spotify.com')) {
+    durationCmd = `yt-dlp -4 --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://open.spotify.com/" "${url}"`;
   } else {
     durationCmd = `yt-dlp -4 --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${url}"`;
   }
@@ -477,6 +532,14 @@ router.post("/", (req, res) => {
           // Standard Twitch stream/VOD handling
           ytCmd = `yt-dlp -4 -f "bestaudio[ext=m4a]/bestaudio/best" --extract-audio --audio-format mp3 --no-playlist --no-warnings --no-progress --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.twitch.tv/" --add-header "Client-Id:kimne78kx3ncx6brgo4mv6wki5h1ko" -o "${outputPath}" "${url}"`;
         }
+      } else if (url.includes('twitter.com') || url.includes('x.com')) {
+        // Special handling for Twitter/X with enhanced user agent and format selection
+        console.log("Processing Twitter/X URL:", url);
+        ytCmd = `yt-dlp -4 -f "bestaudio/best" --extract-audio --audio-format mp3 --no-playlist --no-warnings --no-progress --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://twitter.com/" -o "${outputPath}" "${url}"`;
+      } else if (url.includes('spotify.com')) {
+        // Special handling for Spotify with enhanced user agent and format selection
+        console.log("Processing Spotify URL:", url);
+        ytCmd = `yt-dlp -4 -f "bestaudio/best" --extract-audio --audio-format mp3 --no-playlist --no-warnings --no-progress --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://open.spotify.com/" -o "${outputPath}" "${url}"`;
       } else {
         // Standard command for other platforms
         ytCmd = `yt-dlp -4 -f bestaudio --extract-audio --audio-format mp3 --no-playlist --no-warnings --no-progress --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -o "${outputPath}" "${url}"`;
@@ -548,12 +611,11 @@ router.post("/", (req, res) => {
               dl.error = 'Output file not found. Please try again';
             }
           }
-        } catch (error) {
-          console.error("Error checking file:", error);
-          const dl = activeDownloads.get(downloadId);
+        } catch (fileError) {
+          console.error("Error checking file:", fileError);
           if (dl) {
             dl.status = 'error';
-            dl.error = error.message;
+            dl.error = 'Error checking file';
           }
         }
       });

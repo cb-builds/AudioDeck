@@ -14,7 +14,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
   const [showProgress, setShowProgress] = useState(false);
   const [progressValue, setProgressValue] = useState(0);
   const [progressText, setProgressText] = useState("");
-  const [currentVideoName, setCurrentVideoName] = useState("");
+  const [currentAudioName, setCurrentAudioName] = useState("");
   const [activeSSEConnections, setActiveSSEConnections] = useState(new Set());
   const [isDownloadStarted, setIsDownloadStarted] = useState(false);
 
@@ -231,11 +231,11 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
   };
 
   const handleYoutubeDownload = async () => {
-    if (!ytUrl) return setStatus("Please enter a video URL.");
+    if (!ytUrl) return setStatus("Please enter an audio/video URL.");
     setIsVideoUploading(true);
     setIsDownloadStarted(false); // Reset download started flag
-    startProgress("Gathering Video Metadata...");
-    setStatus("Gathering Video Metadata...");
+    startProgress("Gathering Audio Metadata...");
+    setStatus("Gathering Audio Metadata...");
     
     try {
       
@@ -283,28 +283,28 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       
       // Progress: 10% after duration check
       animateProgressTo(10);
-      setProgressText("Gathering Video Metadata...");
+      setProgressText("Gathering Audio Metadata...");
       
       // Get video title before downloading
-      let videoName = "Imported Video";
+      let videoName = "Imported Audio";
       try {
         const titleRes = await fetchWithTimeout(`/api/youtube/title?url=${encodeURIComponent(ytUrl)}`);
         
         if (titleRes.ok) {
           const titleData = await titleRes.json();
-          videoName = titleData.title || "Imported Video";
+          videoName = titleData.title || "Imported Audio";
         } else {
           // Fallback to platform-specific naming
           if (ytUrl.includes('youtube.com/') || ytUrl.includes('youtu.be/')) {
             const videoId = ytUrl.includes('v=') ? ytUrl.split('v=')[1]?.split('&')[0] : 
                            ytUrl.includes('youtu.be/') ? ytUrl.split('youtu.be/')[1]?.split('?')[0] : '';
-            videoName = videoId ? `YouTube Video (${videoId})` : "YouTube Video";
+            videoName = videoId ? `YouTube Audio (${videoId})` : "YouTube Audio";
           } else if (ytUrl.includes('tiktok.com/')) {
             const tiktokMatch = ytUrl.match(/tiktok\.com\/@[^\/]+\/video\/(\d+)/);
             if (tiktokMatch) {
-              videoName = `TikTok Video (${tiktokMatch[1]})`;
+              videoName = `TikTok Audio (${tiktokMatch[1]})`;
             } else {
-              videoName = "TikTok Video";
+              videoName = "TikTok Audio";
             }
           } else if (ytUrl.includes('twitch.tv/')) {
             // Extract Twitch streamer name, video ID, or clip ID
@@ -330,8 +330,47 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
                   videoName = `Twitch Stream (${streamer})`;
                 }
               } else {
-                videoName = "Twitch Video";
+                videoName = "Twitch Audio";
               }
+            }
+          } else if (ytUrl.includes('twitter.com/') || ytUrl.includes('x.com/')) {
+            // Extract Twitter/X post information
+            const twitterMatch = ytUrl.match(/(?:twitter\.com|x\.com)\/([^\/]+)\/status\/(\d+)/);
+            if (twitterMatch) {
+              const username = twitterMatch[1];
+              const tweetId = twitterMatch[2];
+              videoName = `Twitter Post (${username} - ${tweetId})`;
+            } else {
+              videoName = "Twitter Post";
+            }
+          } else if (ytUrl.includes('spotify.com/')) {
+            // Extract Spotify track/playlist information
+            if (ytUrl.includes('/track/')) {
+              const trackMatch = ytUrl.match(/spotify\.com\/track\/([a-zA-Z0-9]+)/);
+              if (trackMatch) {
+                const trackId = trackMatch[1];
+                videoName = `Spotify Track (${trackId})`;
+              } else {
+                videoName = "Spotify Track";
+              }
+            } else if (ytUrl.includes('/playlist/')) {
+              const playlistMatch = ytUrl.match(/spotify\.com\/playlist\/([a-zA-Z0-9]+)/);
+              if (playlistMatch) {
+                const playlistId = playlistMatch[1];
+                videoName = `Spotify Playlist (${playlistId})`;
+              } else {
+                videoName = "Spotify Playlist";
+              }
+            } else if (ytUrl.includes('/album/')) {
+              const albumMatch = ytUrl.match(/spotify\.com\/album\/([a-zA-Z0-9]+)/);
+              if (albumMatch) {
+                const albumId = albumMatch[1];
+                videoName = `Spotify Album (${albumId})`;
+              } else {
+                videoName = "Spotify Album";
+              }
+            } else {
+              videoName = "Spotify Audio";
             }
           }
         }
@@ -340,13 +379,13 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
         if (ytUrl.includes('youtube.com/') || ytUrl.includes('youtu.be/')) {
           const videoId = ytUrl.includes('v=') ? ytUrl.split('v=')[1]?.split('&')[0] : 
                          ytUrl.includes('youtu.be/') ? ytUrl.split('youtu.be/')[1]?.split('?')[0] : '';
-          videoName = videoId ? `YouTube Video (${videoId})` : "YouTube Video";
+          videoName = videoId ? `YouTube Audio (${videoId})` : "YouTube Audio";
         } else if (ytUrl.includes('tiktok.com/')) {
           const tiktokMatch = ytUrl.match(/tiktok\.com\/@[^\/]+\/video\/(\d+)/);
           if (tiktokMatch) {
-            videoName = `TikTok Video (${tiktokMatch[1]})`;
+            videoName = `TikTok Audio (${tiktokMatch[1]})`;
           } else {
-            videoName = "TikTok Video";
+            videoName = "TikTok Audio";
           }
         } else if (ytUrl.includes('twitch.tv/')) {
           // Extract Twitch streamer name, video ID, or clip ID
@@ -372,18 +411,57 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
                 videoName = `Twitch Stream (${streamer})`;
               }
             } else {
-              videoName = "Twitch Video";
+              videoName = "Twitch Audio";
             }
+          }
+        } else if (ytUrl.includes('twitter.com/') || ytUrl.includes('x.com/')) {
+          // Extract Twitter/X post information
+          const twitterMatch = ytUrl.match(/(?:twitter\.com|x\.com)\/([^\/]+)\/status\/(\d+)/);
+          if (twitterMatch) {
+            const username = twitterMatch[1];
+            const tweetId = twitterMatch[2];
+            videoName = `Twitter Post (${username} - ${tweetId})`;
+          } else {
+            videoName = "Twitter Post";
+          }
+        } else if (ytUrl.includes('spotify.com/')) {
+          // Extract Spotify track/playlist information
+          if (ytUrl.includes('/track/')) {
+            const trackMatch = ytUrl.match(/spotify\.com\/track\/([a-zA-Z0-9]+)/);
+            if (trackMatch) {
+              const trackId = trackMatch[1];
+              videoName = `Spotify Track (${trackId})`;
+            } else {
+              videoName = "Spotify Track";
+            }
+          } else if (ytUrl.includes('/playlist/')) {
+            const playlistMatch = ytUrl.match(/spotify\.com\/playlist\/([a-zA-Z0-9]+)/);
+            if (playlistMatch) {
+              const playlistId = playlistMatch[1];
+              videoName = `Spotify Playlist (${playlistId})`;
+            } else {
+              videoName = "Spotify Playlist";
+            }
+          } else if (ytUrl.includes('/album/')) {
+            const albumMatch = ytUrl.match(/spotify\.com\/album\/([a-zA-Z0-9]+)/);
+            if (albumMatch) {
+              const albumId = albumMatch[1];
+              videoName = `Spotify Album (${albumId})`;
+            } else {
+              videoName = "Spotify Album";
+            }
+          } else {
+            videoName = "Spotify Audio";
           }
         }
       }
       
       // Progress: 20% after title extraction
       animateProgressTo(20);
-      setProgressText("Gathering Video Metadata...");
+      setProgressText("Gathering Audio Metadata...");
       
       // Store the video name in state for use in SSE handler
-      setCurrentVideoName(videoName);
+      setCurrentAudioName(videoName);
       
       const res = await fetchWithTimeout("/api/youtube", {
         method: "POST",
@@ -738,16 +816,16 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
               background: 'linear-gradient(135deg, #36D1DC, #5B86E5)'
             }}
           >
-            <span className="text-white text-lg">🎥</span>
+            <span className="text-white text-lg">🎵</span>
           </div>
-          <h2 className="text-xl font-semibold text-white">Upload from Video Platform</h2>
+          <h2 className="text-xl font-semibold text-white">Upload from Audio/Video Platform</h2>
         </div>
         
         <div className="space-y-4 flex-1 flex flex-col">
           <div className="flex-1 flex items-center">
             <input
               type="text"
-              placeholder="Video URL (YouTube, TikTok, Twitch)"
+              placeholder="Video URL (YouTube, TikTok, Twitch, etc...)"
               value={ytUrl}
               onChange={(e) => setYtUrl(e.target.value)}
               className="w-full p-4 rounded-xl text-white placeholder-gray-500 transition-all duration-300 focus:outline-none focus:ring-2"
@@ -773,7 +851,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
                 Downloading...
               </div>
             ) : (
-              "Upload from Video Platform"
+              "Download Audio from Platform"
             )}
           </button>
         </div>
