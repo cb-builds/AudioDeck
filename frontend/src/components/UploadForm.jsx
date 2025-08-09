@@ -467,14 +467,23 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       };
       let completionHandled = false;
       let errorHandled = false;
+      let lastLoggedProgressSSE = -1;
       es.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'progress') {
+            // Only log progress changes in 10% increments or status changes
             const progress = data.progress || 0;
+            const status = data.status || 'downloading';
+            if (Math.floor(progress / 10) > Math.floor(lastLoggedProgressSSE / 10) || 
+                status !== 'downloading' || 
+                lastLoggedProgressSSE === -1) {
+              console.log(`SSE progress: ${Math.round(progress)}% (${status})`);
+              lastLoggedProgressSSE = progress;
+            }
+            
             const downloadedBytes = data.downloadedBytes || 0;
             const totalBytes = data.totalBytes || 0;
-            const status = data.status || 'downloading';
             if (status === 'error' && !errorHandled) {
               errorHandled = true;
               const errorMessage = data.error || 'Download failed';
@@ -549,15 +558,25 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
 
     let completionHandled = false;
     let errorHandled = false;
+    let lastLoggedProgress = -1;
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'progress') {
           anyProgress = true;
+          
+          // Only log progress changes in 10% increments or status changes
           const progress = data.progress || 0;
+          const status = data.status || 'downloading';
+          if (Math.floor(progress / 10) > Math.floor(lastLoggedProgress / 10) || 
+              status !== 'downloading' || 
+              lastLoggedProgress === -1) {
+            console.log(`WebSocket progress: ${Math.round(progress)}% (${status})`);
+            lastLoggedProgress = progress;
+          }
+          
           const downloadedBytes = data.downloadedBytes || 0;
           const totalBytes = data.totalBytes || 0;
-          const status = data.status || 'downloading';
           if (status === 'error' && !errorHandled) {
             errorHandled = true;
             const errorMessage = data.error || 'Download failed';
