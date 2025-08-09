@@ -847,8 +847,8 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
     try {
       const requestBody = {
         filename: clip,
-        startTime: start.toFixed(2),
-        endTime: end.toFixed(2),
+        startTime: start.toFixed(6),
+        endTime: end.toFixed(6),
         newName,
       };
       
@@ -959,8 +959,8 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
       // First, save the trimmed file
       const trimRequestBody = {
         filename: clip,
-        startTime: start.toFixed(2),
-        endTime: end.toFixed(2),
+        startTime: start.toFixed(6),
+        endTime: end.toFixed(6),
         newName: newName || 'trimmed'
       };
 

@@ -20,7 +20,12 @@ router.post("/", (req, res) => {
     return res.status(404).json({ error: "Input file not found." });
   }
 
-  const cmd = `ffmpeg -y -i "${inputPath}" -ss ${startTime} -to ${endTime} -c copy "${outputPath}"`;
+  // Calculate duration for more precise trimming
+  const duration = (parseFloat(endTime) - parseFloat(startTime)).toFixed(6);
+  
+  // Use -ss for start time and -t for duration (more accurate than -to)
+  // Also use -avoid_negative_ts make_zero for better precision
+  const cmd = `ffmpeg -y -ss ${parseFloat(startTime).toFixed(6)} -i "${inputPath}" -t ${duration} -avoid_negative_ts make_zero -c copy "${outputPath}"`;
 
   exec(cmd, (err) => {
     if (err) return res.status(500).json({ error: "ffmpeg trim failed", details: err.message });
