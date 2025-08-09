@@ -4,8 +4,11 @@ const fileUpload = require("express-fileupload");
 const path = require("path");
 const fs = require("fs");
 const { startCleanupScheduler } = require("./cleanup");
+const http = require('http');
+const { initWebSocketServer } = require('./wsHub');
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 4000;
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || `${25 * 1024 * 1024}`, 10);
 
@@ -124,9 +127,9 @@ app.get("*", (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`AudioDeck backend running on port ${PORT}`);
-  
+  initWebSocketServer(server);
   // Start the automatic cleanup scheduler
   startCleanupScheduler();
 });

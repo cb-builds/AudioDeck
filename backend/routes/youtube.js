@@ -3,11 +3,123 @@ const router = express.Router();
 const path = require("path");
 const { exec } = require("child_process");
 const fs = require("fs");
+const { broadcastProgress } = require('../wsHub');
+
+// Track active downloads and their progress
+const activeDownloads = new Map();
+const progressLoops = new Map();
+
+function startProgressLoop(downloadId) {
+  if (progressLoops.has(downloadId)) return;
+  const interval = setInterval(() => {
+    const download = activeDownloads.get(downloadId);
+    if (!download) {
+      clearInterval(interval);
+      progressLoops.delete(downloadId);
+      return;
+    }
+
+    // Determine best progress source: prefer final MP3, else temp media files
+    const finalPath = download.outputPath;
+    const basePath = finalPath.endsWith('.mp3') ? finalPath.slice(0, -4) : finalPath;
+    const candidatePaths = [
+      finalPath,                 // final MP3
+      `${basePath}.m4a`,         // audio-only m4a
+      `${basePath}.webm`,        // audio-only webm
+      `${basePath}.mp4`,         // temp HLS/merged video
+      `${finalPath}.part`,
+      `${basePath}.m4a.part`,
+      `${basePath}.webm.part`,
+      `${basePath}.mp4.part`,
+    ];
+
+    let progressSourcePath = null;
+    let usingTempSource = true;
+    for (const p of candidatePaths) {
+      if (fs.existsSync(p)) {
+        progressSourcePath = p;
+        if (p === finalPath) usingTempSource = false;
+        break;
+      }
+    }
+
+    if (progressSourcePath) {
+      try {
+        const stats = fs.statSync(progressSourcePath);
+        const currentSize = stats.size;
+
+        if (Math.abs(currentSize - (download.downloadedBytes || 0)) > 1024) {
+          download.downloadedBytes = currentSize;
+
+          let newProgress = download.progress || 0;
+
+          if (usingTempSource) {
+            const prevEstimate = download.estimatedTempBytes || 0;
+            const estimate = Math.max(prevEstimate, Math.floor(currentSize * 1.2), 1024 * 1024);
+            download.estimatedTempBytes = estimate;
+            const tempProgress = Math.round((currentSize / estimate) * 90);
+            newProgress = Math.max(newProgress, Math.min(tempProgress, 90));
+          } else {
+            let effectiveTotal = 0;
+            if (download.expectedTotalBytes && download.expectedTotalBytes > 0) {
+              effectiveTotal = download.expectedTotalBytes;
+            } else if (download.totalBytes && download.totalBytes > 0) {
+              effectiveTotal = download.totalBytes;
+            }
+            if (effectiveTotal < currentSize) {
+              effectiveTotal = currentSize;
+            }
+            download.totalBytes = effectiveTotal;
+            const mp3Progress = Math.round((currentSize / effectiveTotal) * 100);
+            newProgress = Math.max(newProgress, Math.min(mp3Progress, 99));
+          }
+
+          if (
+            typeof download.lastLoggedProgress !== 'number' ||
+            newProgress - download.lastLoggedProgress >= 5
+          ) {
+            console.log(
+              `Progress ${downloadId}: ${newProgress}% (source=${usingTempSource ? 'temp' : 'mp3'}, size=${currentSize} bytes)`
+            );
+            download.lastLoggedProgress = newProgress;
+          }
+
+          download.progress = newProgress;
+        }
+      } catch (error) {
+        console.error("Error checking progress source size:", error);
+      }
+    }
+
+    const displayTotal = usingTempSource
+      ? Math.max(download.estimatedTempBytes || 0, download.downloadedBytes || 0)
+      : Math.max(
+          (download.totalBytes || download.expectedTotalBytes || 0),
+          download.downloadedBytes || 0
+        );
+
+    const progressData = {
+      type: 'progress',
+      progress: download.progress,
+      downloadedBytes: download.downloadedBytes,
+      totalBytes: displayTotal,
+      status: download.status,
+      error: download.error,
+      videoDuration: download.videoDuration
+    };
+
+    broadcastProgress(downloadId, progressData);
+
+    if (download.status === 'complete' || download.status === 'error') {
+      clearInterval(interval);
+      progressLoops.delete(downloadId);
+    }
+  }, 200);
+
+  progressLoops.set(downloadId, interval);
+}
 
 const CLIPS_DIR = path.join(__dirname, "../clips");
-
-// Store active downloads and their progress
-const activeDownloads = new Map();
 
 // GET /api/youtube/progress/:downloadId - SSE endpoint for progress updates
 router.get("/progress/:downloadId", (req, res) => {
@@ -139,19 +251,19 @@ router.get("/progress/:downloadId", (req, res) => {
         error: download.error,
         videoDuration: download.videoDuration
       };
-
-      res.write(`data: ${JSON.stringify(progressData)}\n\n`);
+      // Send over WebSocket
+      broadcastProgress(downloadId, progressData);
 
       // If download is complete, close the connection after sending the final update
       if (download.status === 'complete' || download.status === 'error') {
         console.log(`Download ${downloadId} is ${download.status}, closing SSE connection`);
         clearInterval(progressInterval);
-        res.end();
+        try { res.end(); } catch (_) {}
       }
     } else {
       console.log(`No download tracking found for ${downloadId}`);
     }
-  }, 500); // Check every 500ms for smoother updates
+  }, 200);
 
   // Clean up on client disconnect
   req.on('close', () => {
@@ -362,6 +474,9 @@ router.post("/", (req, res) => {
     expectedTotalBytes: 0
   });
 
+  // Start progress loop for WS consumers
+  startProgressLoop(downloadId);
+
   console.log("Starting duration extraction...");
 
   // Extract video duration first
@@ -425,6 +540,9 @@ router.post("/", (req, res) => {
       if (d) {
         d.expectedTotalBytes = expectedBytes;
       }
+
+      // Ensure loop is running (idempotent)
+      startProgressLoop(downloadId);
 
       // Enhanced yt-dlp command with progress tracking - direct MP3 extraction
       let ytCmd;
