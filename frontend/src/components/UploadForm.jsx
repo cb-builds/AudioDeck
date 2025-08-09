@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { truncateText } from "../utils/textUtils";
 
 const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
@@ -17,6 +17,33 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
   const [currentVideoName, setCurrentVideoName] = useState("");
   const [activeSSEConnections, setActiveSSEConnections] = useState(new Set());
   const [isDownloadStarted, setIsDownloadStarted] = useState(false);
+
+  const progressAnimRef = useRef(null);
+  const targetProgressRef = useRef(0);
+  const currentProgressRef = useRef(0);
+
+  const animateProgressTo = (target) => {
+    targetProgressRef.current = target;
+    if (progressAnimRef.current) return; // already animating
+
+    const step = () => {
+      const current = currentProgressRef.current;
+      const desired = targetProgressRef.current;
+      if (Math.abs(desired - current) < 0.5) {
+        currentProgressRef.current = desired;
+        updateProgress(Math.round(desired));
+        progressAnimRef.current = null;
+        return;
+      }
+      const delta = (desired - current) * 0.15; // ease towards target
+      const next = current + delta;
+      currentProgressRef.current = next;
+      updateProgress(Math.round(next));
+      progressAnimRef.current = requestAnimationFrame(step);
+    };
+
+    progressAnimRef.current = requestAnimationFrame(step);
+  };
 
   // Helper to add a timeout to fetch requests
   const fetchWithTimeout = (url, options = {}, timeoutMs = 10000) => {
@@ -52,20 +79,17 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
   };
 
   const startProgress = (text) => {
-    console.log("startProgress called with:", text);
     setShowProgress(true);
     setProgressValue(0);
     setProgressText(text);
   };
 
   const updateProgress = (value, text) => {
-    console.log("updateProgress called with:", value, text);
     setProgressValue(value);
     if (text) setProgressText(text);
   };
 
   const hideProgress = () => {
-    console.log("hideProgress called");
     setShowProgress(false);
     setProgressValue(0);
     setProgressText("");
@@ -184,25 +208,19 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
     setStatus("Gathering Video Metadata...");
     
     try {
-      console.log("Starting video download for URL:", ytUrl);
       
       // First, check video duration
-      console.log("Checking video duration...");
       try {
-        console.log("Making duration request to:", `/api/youtube/duration?url=${encodeURIComponent(ytUrl)}`);
         const durationRes = await fetchWithTimeout(`/api/youtube/duration?url=${encodeURIComponent(ytUrl)}`);
-        console.log("Duration response status:", durationRes.status);
         
         if (durationRes.ok) {
           const durationData = await durationRes.json();
-          console.log("Duration data:", durationData);
           
           if (durationData.isTooLong) {
             const minutes = Math.floor(durationData.duration / 60);
             const seconds = durationData.duration % 60;
             const durationFormatted = `${minutes}:${seconds.toString().padStart(2, '0')}`;
             
-            console.log("Video too long, showing popup and stopping download");
             hideProgress();
             showErrorPopup(
               "❌ Video Too Long",
@@ -211,13 +229,9 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
             setStatus("Video too long. Please try a shorter video.");
             setIsVideoUploading(false);
             return;
-          } else {
-            console.log("Duration check passed, video is within limit");
           }
         } else {
-          console.log("Duration response not ok, status:", durationRes.status);
           const errorText = await durationRes.text();
-          console.log("Duration error response:", errorText);
           hideProgress();
           const message = 'Output file not found. Please check link and try again.';
           showErrorPopup("❌ Download Failed", message);
@@ -226,7 +240,6 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
           return;
         }
       } catch (durationError) {
-        console.log("Duration check failed with error:", durationError);
         // Fail fast on duration errors/timeouts and stop further API calls
         hideProgress();
         const message = (durationError && typeof durationError.message === 'string' && durationError.message.includes('Output file not found'))
@@ -239,23 +252,18 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       }
       
       // Progress: 10% after duration check
+      animateProgressTo(10);
       updateProgress(10, "Gathering Video Metadata...");
-      
-      console.log("Proceeding to download phase...");
-      setStatus("Gathering Video Metadata...");
       
       // Get video title before downloading
       let videoName = "Imported Video";
       try {
-        console.log("Getting video title...");
         const titleRes = await fetchWithTimeout(`/api/youtube/title?url=${encodeURIComponent(ytUrl)}`);
         
         if (titleRes.ok) {
           const titleData = await titleRes.json();
           videoName = titleData.title || "Imported Video";
-          console.log("Got video title:", videoName);
         } else {
-          console.log("Could not get video title, using fallback");
           // Fallback to platform-specific naming
           if (ytUrl.includes('youtube.com/') || ytUrl.includes('youtu.be/')) {
             const videoId = ytUrl.includes('v=') ? ytUrl.split('v=')[1]?.split('&')[0] : 
@@ -298,7 +306,6 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
           }
         }
       } catch (titleError) {
-        console.log("Title extraction failed, using fallback:", titleError);
         // Same fallback logic as above
         if (ytUrl.includes('youtube.com/') || ytUrl.includes('youtu.be/')) {
           const videoId = ytUrl.includes('v=') ? ytUrl.split('v=')[1]?.split('&')[0] : 
@@ -342,12 +349,12 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       }
       
       // Progress: 20% after title extraction
+      animateProgressTo(20);
       updateProgress(20, "Gathering Video Metadata...");
       
       // Store the video name in state for use in SSE handler
       setCurrentVideoName(videoName);
       
-      console.log("Making download request to /api/youtube");
       const res = await fetchWithTimeout("/api/youtube", {
         method: "POST",
         headers: {
@@ -359,10 +366,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
         }),
       });
       
-      console.log("Download response status:", res.status);
-      
-      // Progress: 30% after download request
-      updateProgress(30, "Gathering Video Metadata...");
+      // Removed 30% tier at request stage
       
       if (!res.ok) {
         const errorData = await res.json();
@@ -400,12 +404,8 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       }
       
       const data = await res.json();
-      console.log("Download started:", data);
-      console.log("Received videoDuration:", data.videoDuration);
-      console.log("Full response data:", JSON.stringify(data, null, 2));
       
-      // Progress: 40% after response data
-      updateProgress(40, "Gathering Video Metadata...");
+      // Removed 40% tier at response stage
       
       // Start listening for progress updates if we have a downloadId
       if (data.downloadId) {
@@ -456,8 +456,9 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
     
     eventSource.onopen = () => {
       console.log("SSE connection opened");
-      // Progress: 50% after SSE connection opens
-      updateProgress(50, "Gathering Video Metadata...");
+      // Progress: 30% after SSE connection opens
+      animateProgressTo(30);
+      updateProgress(30, "Preparing Download...");
     };
     
     // Store the downloadId and video name for use in completion
@@ -465,11 +466,11 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
     let currentVideoName = videoName;
     let completionHandled = false; // Flag to prevent multiple completion calls
     let errorHandled = false; // Flag to prevent multiple error popups
+    let lastProgressUpdate = 0; // Track last progress update time for throttling
     
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log("Progress update:", data);
         
         if (data.type === 'progress') {
           const progress = data.progress || 0;
@@ -509,17 +510,24 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
           
           // Show "Preparing Download..." until we have actual file sizes
           if (downloadedBytes === 0 && totalBytes === 0) {
-            updateProgress(50, "Gathering Video Metadata...");
+            updateProgress(30, "Preparing Download...");
             setStatus("Preparing Download...");
           } else {
             // Download has actually started - set the flag
             if (!isDownloadStarted) {
               setIsDownloadStarted(true);
             }
-            // Map the 0-100% download progress to 50-100% overall progress
-            const mappedProgress = 50 + (progress * 0.5);
-            updateProgress(mappedProgress, `Downloading: ${downloadedFormatted} / ${totalFormatted}`);
-            setStatus(`Downloading: ${downloadedFormatted} / ${totalFormatted}`);
+            
+            // Map the 0-100% download progress to 30-100% overall progress
+            const mappedProgress = Math.min(100, 30 + (progress * 0.7));
+            
+            // Throttle progress updates to avoid overwhelming the UI (max 10 updates per second)
+            const now = Date.now();
+            if (now - lastProgressUpdate > 100) { // Update at most every 100ms
+              updateProgress(mappedProgress, "Downloading...");
+              setStatus("Downloading...");
+              lastProgressUpdate = now;
+            }
           }
           
           // If progress is 100% or status is complete, handle completion
