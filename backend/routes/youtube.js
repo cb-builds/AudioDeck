@@ -135,6 +135,7 @@ router.get("/progress/:downloadId", (req, res) => {
 
   // Send initial connection message
   res.write(`data: ${JSON.stringify({ type: 'connected', downloadId })}\n\n`);
+  const existingDownload = activeDownloads.get(downloadId);
 
   if (existingDownload) {
     const initialProgressData = {
@@ -460,7 +461,7 @@ router.post("/", (req, res) => {
       let ytCmd;
       if (url.includes('tiktok.com')) {
         // Special handling for TikTok with more flexible format selection
-        ytCmd = `yt-dlp -4 -f "best[height<=720]/best" --extract-audio --audio-format mp3 --no-playlist --no-warnings --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" -o "${outputPath}" --progress-template "%(progress.downloaded_bytes)s/%(progress.total_bytes)s" "${url}"`;
+        ytCmd = `yt-dlp -4 -f "best[height<=720]/best" --extract-audio --audio-format mp3 --no-playlist --no-warnings --no-progress --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" -o "${outputPath}" "${url}"`;
       } else if (url.includes('twitch.tv')) {
         // Special handling for Twitch with enhanced authentication and format selection
         console.log("Processing Twitch URL:", url);
@@ -470,15 +471,15 @@ router.post("/", (req, res) => {
         if (url.includes('/clip/')) {
           console.log("Processing as Twitch clip");
           // Special handling for Twitch clips
-          ytCmd = `yt-dlp -4 -f "bestaudio[ext=m4a]/bestaudio/best" --extract-audio --audio-format mp3 --no-playlist --no-warnings --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.twitch.tv/" --add-header "Client-Id:kimne78kx3ncx6brgo4mv6wki5h1ko" -o "${outputPath}" --progress-template "%(progress.downloaded_bytes)s/%(progress.total_bytes)s" "${url}"`;
+          ytCmd = `yt-dlp -4 -f "bestaudio[ext=m4a]/bestaudio/best" --extract-audio --audio-format mp3 --no-playlist --no-warnings --no-progress --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.twitch.tv/" --add-header "Client-Id:kimne78kx3ncx6brgo4mv6wki5h1ko" -o "${outputPath}" "${url}"`;
         } else {
           console.log("Processing as Twitch stream/VOD");
           // Standard Twitch stream/VOD handling
-          ytCmd = `yt-dlp -4 -f "bestaudio[ext=m4a]/bestaudio/best" --extract-audio --audio-format mp3 --no-playlist --no-warnings --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.twitch.tv/" --add-header "Client-Id:kimne78kx3ncx6brgo4mv6wki5h1ko" -o "${outputPath}" --progress-template "%(progress.downloaded_bytes)s/%(progress.total_bytes)s" "${url}"`;
+          ytCmd = `yt-dlp -4 -f "bestaudio[ext=m4a]/bestaudio/best" --extract-audio --audio-format mp3 --no-playlist --no-warnings --no-progress --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.twitch.tv/" --add-header "Client-Id:kimne78kx3ncx6brgo4mv6wki5h1ko" -o "${outputPath}" "${url}"`;
         }
       } else {
         // Standard command for other platforms
-        ytCmd = `yt-dlp -4 -f bestaudio --extract-audio --audio-format mp3 --no-playlist --no-warnings --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -o "${outputPath}" --progress-template "%(progress.downloaded_bytes)s/%(progress.total_bytes)s" "${url}"`;
+        ytCmd = `yt-dlp -4 -f bestaudio --extract-audio --audio-format mp3 --no-playlist --no-warnings --no-progress --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -o "${outputPath}" "${url}"`;
       }
       
       console.log("Running:", ytCmd);
@@ -495,7 +496,7 @@ router.post("/", (req, res) => {
         if (err) {
           console.error("yt-dlp error:", err);
           console.error("stderr:", stderr);
-          console.error("stdout:", stdout);
+          
           
           // Update download status
           const dl = activeDownloads.get(downloadId);
@@ -509,7 +510,7 @@ router.post("/", (req, res) => {
           console.error("Download failed:", err.message);
         }
 
-        console.log("yt-dlp stdout:", stdout);
+        
 
         // Check if file exists before checking size
         try {
