@@ -1,4 +1,5 @@
-const { WebSocketServer } = require('ws');
+const WebSocket = require('ws');
+const { WebSocketServer } = WebSocket;
 
 const downloadIdToClients = new Map();
 let wss;
@@ -42,7 +43,7 @@ function initWebSocketServer(server) {
 }
 
 function safeSend(ws, data) {
-  if (ws.readyState === ws.OPEN) {
+  if (ws.readyState === WebSocket.OPEN) {
     ws.send(data);
   }
 }

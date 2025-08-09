@@ -136,141 +136,50 @@ router.get("/progress/:downloadId", (req, res) => {
   // Send initial connection message
   res.write(`data: ${JSON.stringify({ type: 'connected', downloadId })}\n\n`);
 
-  // Check for existing progress
-  const download = activeDownloads.get(downloadId);
-  if (download) {
-    res.write(`data: ${JSON.stringify({ 
-      type: 'progress', 
-      progress: download.progress,
-      downloadedBytes: download.downloadedBytes,
-      totalBytes: download.totalBytes,
-      status: download.status,
-      error: download.error,
-      videoDuration: download.videoDuration // Include video duration in initial progress
-    })}\n\n`);
+  if (existingDownload) {
+    const initialProgressData = {
+      type: 'progress',
+      progress: existingDownload.progress,
+      downloadedBytes: existingDownload.downloadedBytes,
+      totalBytes: existingDownload.totalBytes,
+      status: existingDownload.status,
+      error: existingDownload.error,
+      videoDuration: existingDownload.videoDuration
+    };
+    try { res.write(`data: ${JSON.stringify(initialProgressData)}\n\n`); } catch (_) {}
   }
 
-  // Set up interval to send progress updates
-  const progressInterval = setInterval(() => {
+  // Monitor download completion and send final update to SSE client
+  const checkCompletion = setInterval(() => {
     const download = activeDownloads.get(downloadId);
-    if (download) {
-      // Determine best progress source: prefer final MP3, else temp media files
-      const finalPath = download.outputPath;
-      const basePath = finalPath.endsWith('.mp3') ? finalPath.slice(0, -4) : finalPath;
-      const candidatePaths = [
-        finalPath,                 // final MP3
-        `${basePath}.m4a`,         // audio-only m4a
-        `${basePath}.webm`,        // audio-only webm
-        `${basePath}.mp4`,         // temp HLS/merged video
-        `${finalPath}.part`,
-        `${basePath}.m4a.part`,
-        `${basePath}.webm.part`,
-        `${basePath}.mp4.part`,
-      ];
+    if (!download) {
+      clearInterval(checkCompletion);
+      try { res.end(); } catch (_) {}
+      return;
+    }
 
-      let progressSourcePath = null;
-      let usingTempSource = true;
-      for (const p of candidatePaths) {
-        if (fs.existsSync(p)) {
-          progressSourcePath = p;
-          if (p === finalPath) usingTempSource = false;
-          break;
-        }
-      }
-
-      if (progressSourcePath) {
-        try {
-          const stats = fs.statSync(progressSourcePath);
-          const currentSize = stats.size;
-
-          // Only update if file size changed significantly (>1KB)
-          if (Math.abs(currentSize - (download.downloadedBytes || 0)) > 1024) {
-            download.downloadedBytes = currentSize;
-
-            let newProgress = download.progress || 0;
-
-            if (usingTempSource) {
-              // Estimate a temp total to map temp growth to 0-90%
-              const prevEstimate = download.estimatedTempBytes || 0;
-              const estimate = Math.max(prevEstimate, Math.floor(currentSize * 1.2), 1024 * 1024); // at least 1MB
-              download.estimatedTempBytes = estimate;
-
-              const tempProgress = Math.round((currentSize / estimate) * 90);
-              newProgress = Math.max(newProgress, Math.min(tempProgress, 90));
-            } else {
-              // Final MP3 exists: prefer expected total if available
-              let effectiveTotal = 0;
-              if (download.expectedTotalBytes && download.expectedTotalBytes > 0) {
-                effectiveTotal = download.expectedTotalBytes;
-              } else if (download.totalBytes && download.totalBytes > 0) {
-                effectiveTotal = download.totalBytes;
-              }
-              // Never allow total to be less than what we have already
-              if (effectiveTotal < currentSize) {
-                effectiveTotal = currentSize;
-              }
-              download.totalBytes = effectiveTotal;
-
-              const mp3Progress = Math.round((currentSize / effectiveTotal) * 100);
-              // Cap at 99% until completion handler marks complete
-              newProgress = Math.max(newProgress, Math.min(mp3Progress, 99));
-            }
-
-            // Throttle console logs: only when progress jumps by >=5%
-            if (
-              typeof download.lastLoggedProgress !== 'number' ||
-              newProgress - download.lastLoggedProgress >= 5
-            ) {
-              console.log(
-                `Progress ${downloadId}: ${newProgress}% (source=${usingTempSource ? 'temp' : 'mp3'}, size=${currentSize} bytes)`
-              );
-              download.lastLoggedProgress = newProgress;
-            }
-
-            download.progress = newProgress;
-          }
-        } catch (error) {
-          console.error("Error checking progress source size:", error);
-        }
-      }
-
-      // For client display, never send a total smaller than downloadedBytes
-      const displayTotal = usingTempSource
-        ? Math.max(download.estimatedTempBytes || 0, download.downloadedBytes || 0)
-        : Math.max(
-            (download.totalBytes || download.expectedTotalBytes || 0),
-            download.downloadedBytes || 0
-          );
-
-      const progressData = {
+    if (download.status === 'complete' || download.status === 'error') {
+      console.log(`Download ${downloadId} is ${download.status}, closing SSE connection`);
+      
+      const finalProgressData = {
         type: 'progress',
         progress: download.progress,
         downloadedBytes: download.downloadedBytes,
-        totalBytes: displayTotal,
+        totalBytes: download.totalBytes,
         status: download.status,
         error: download.error,
         videoDuration: download.videoDuration
       };
-
-      // Send to SSE client
-      try { res.write(`data: ${JSON.stringify(progressData)}\n\n`); } catch (_) {}
-      // Send over WebSocket
-      broadcastProgress(downloadId, progressData);
-
-      // If download is complete, close the connection after sending the final update
-      if (download.status === 'complete' || download.status === 'error') {
-        console.log(`Download ${downloadId} is ${download.status}, closing SSE connection`);
-        clearInterval(progressInterval);
-        try { res.end(); } catch (_) {}
-      }
-    } else {
-      console.log(`No download tracking found for ${downloadId}`);
+      
+      try { res.write(`data: ${JSON.stringify(finalProgressData)}\n\n`); } catch (_) {}
+      clearInterval(checkCompletion);
+      try { res.end(); } catch (_) {}
     }
-  }, 200);
+  }, 500);
 
   // Clean up on client disconnect
   req.on('close', () => {
-    clearInterval(progressInterval);
+    clearInterval(checkCompletion);
   });
 });
 
