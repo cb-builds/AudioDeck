@@ -484,12 +484,15 @@ router.post("/", (req, res) => {
       console.log("Running:", ytCmd);
 
       // Return the downloadId and duration immediately
+      console.log("🚀🚀🚀 ABOUT TO SEND RESPONSE TO FRONTEND 🚀🚀🚀");
       console.log("Sending response with duration:", videoDuration);
+      console.log("DownloadId:", downloadId);
       res.json({ 
         message: "Download started", 
         downloadId: downloadId,
         videoDuration: videoDuration
       });
+      console.log("✅✅✅ RESPONSE SENT TO FRONTEND ✅✅✅");
 
       // Parse progress from yt-dlp output
       const child = exec(ytCmd, (err, stdout, stderr) => {

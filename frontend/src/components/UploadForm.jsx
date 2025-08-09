@@ -382,7 +382,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
           url: ytUrl,
           name: "imported_video" // Add the required name parameter
         }),
-      });
+      }, 30000); // 30 second timeout for the main download request
       console.log("🚀 /api/youtube POST response received:", res.status);
       
       // Removed 30% tier at request stage
