@@ -37,17 +37,37 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
     // Restart timer to head toward new target
     clearProgressTimer();
 
+    const current = currentProgressRef.current;
+    const desired = targetProgressRef.current;
+    const distance = Math.abs(desired - current);
+    
+    // If distance is very small, just jump immediately
+    if (distance <= 1) {
+      currentProgressRef.current = desired;
+      updateProgress(Math.round(desired));
+      return;
+    }
+    
+    // Calculate dynamic step size to maintain consistent animation duration
+    // Base duration: 10% jump should take ~8 ticks (10 / 1.5 * 120ms = ~800ms)
+    const baseDistance = 10;
+    const baseDuration = (baseDistance / PROGRESS_STEP_PERCENT) * PROGRESS_TICK_MS; // ~800ms
+    
+    // Calculate step size to make this distance take the same duration
+    const totalTicks = baseDuration / PROGRESS_TICK_MS; // ~6.67 ticks
+    const stepSize = distance / totalTicks;
+
     progressAnimRef.current = setInterval(() => {
       const current = currentProgressRef.current;
       const desired = targetProgressRef.current;
-      if (Math.abs(desired - current) <= PROGRESS_STEP_PERCENT) {
+      if (Math.abs(desired - current) <= stepSize) {
         currentProgressRef.current = desired;
         updateProgress(Math.round(desired));
         clearProgressTimer();
         return;
       }
       const dir = desired > current ? 1 : -1;
-      const next = current + dir * PROGRESS_STEP_PERCENT;
+      const next = current + dir * stepSize;
       currentProgressRef.current = next;
       updateProgress(Math.round(next));
     }, PROGRESS_TICK_MS);
