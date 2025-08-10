@@ -251,7 +251,7 @@ router.get("/duration", async (req, res) => {
         durationSeconds = parts[0];
       }
 
-      const maxDuration = 20 * 60; // 20 minutes in seconds
+      const maxDuration = 10 * 60; // 10 minutes in seconds
       const isTooLong = durationSeconds > maxDuration;
 
       res.json({ 
