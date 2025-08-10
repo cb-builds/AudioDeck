@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import UploadForm from "./components/UploadForm";
 import TrimEditor from "./components/TrimEditor";
 
@@ -10,6 +10,7 @@ function App() {
   const [lockVideoPlatformButton, setLockVideoPlatformButton] = useState(false);
   const [resetInputsKey, setResetInputsKey] = useState(0);
   const [isNarrowMobile, setIsNarrowMobile] = useState(false); // < 750px
+  const startOverTopRef = useRef(null);
 
   // Initialize Ko-fi widget
   useEffect(() => {
@@ -58,6 +59,26 @@ function App() {
       }
     };
   }, []);
+
+  // When Trim section appears on mobile, scroll so the Start Over button sits at the top of the viewport
+  useEffect(() => {
+    if (isNarrowMobile && uploadedFile && downloadComplete) {
+      const scrollToStartOver = () => {
+        try {
+          const el = startOverTopRef.current;
+          if (el) {
+            const rect = el.getBoundingClientRect();
+            const y = rect.top + window.pageYOffset - 12; // small offset so button isn't flush with top
+            window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+          }
+        } catch (_) {}
+      };
+      // Run after layout
+      requestAnimationFrame(scrollToStartOver);
+      setTimeout(scrollToStartOver, 100);
+      setTimeout(scrollToStartOver, 300);
+    }
+  }, [isNarrowMobile, uploadedFile, downloadComplete]);
 
   // Track viewport width to enable responsive behavior at 750px breakpoint
   useEffect(() => {
@@ -167,7 +188,7 @@ function App() {
           {uploadedFile && downloadComplete && (
             <>
               {isNarrowMobile && (
-                <div className="flex justify-end -mb-2 pr-4">
+                <div ref={startOverTopRef} className="flex justify-end -mb-2 pr-4">
                   <button
                     onClick={handleStartOver}
                     className="px-4 py-2 rounded-lg font-semibold text-white transition-all duration-300 transform hover:scale-105"
@@ -191,6 +212,8 @@ function App() {
           )}
         </div>
       </div>
+      {/* Invisible spacer at the very bottom to allow comfortable scroll room on mobile */}
+      <div aria-hidden="true" className="w-full h-[50px] pointer-events-none" />
     </div>
   );
 }

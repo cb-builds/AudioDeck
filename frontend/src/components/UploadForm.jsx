@@ -17,6 +17,8 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
   const [currentAudioName, setCurrentAudioName] = useState("");
   const [activeSSEConnections, setActiveSSEConnections] = useState(new Set());
   const [isDownloadStarted, setIsDownloadStarted] = useState(false);
+  const progressBottomRef = useRef(null);
+  const [isNarrowMobile, setIsNarrowMobile] = useState(false); // < 750px
   const [isNarrowViewport, setIsNarrowViewport] = useState(false);
 
   const progressAnimRef = useRef(null);
@@ -30,6 +32,39 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
     const fileEl = document.getElementById('file-upload');
     if (fileEl) fileEl.value = "";
   }, [resetInputsKey]);
+
+  // Track mobile viewport (align with 750px breakpoint used elsewhere)
+  useEffect(() => {
+    const updateFlag = () => {
+      try {
+        if (typeof window !== 'undefined') {
+          setIsNarrowMobile(window.innerWidth < 750);
+        }
+      } catch (_) {}
+    };
+    updateFlag();
+    window.addEventListener('resize', updateFlag);
+    return () => window.removeEventListener('resize', updateFlag);
+  }, []);
+
+  // When progress opens on mobile, auto-scroll to the bottom of the page
+  useEffect(() => {
+    if (showProgress && isNarrowMobile) {
+      const scrollToBottom = () => {
+        try {
+          const h = Math.max(
+            document.body.scrollHeight,
+            document.documentElement.scrollHeight
+          );
+          window.scrollTo({ top: h, behavior: 'smooth' });
+        } catch (_) {}
+      };
+      // Try a few times to ensure after layout/async content
+      requestAnimationFrame(scrollToBottom);
+      setTimeout(scrollToBottom, 100);
+      setTimeout(scrollToBottom, 300);
+    }
+  }, [showProgress, isNarrowMobile]);
 
   // Track viewport width to adjust placeholder text responsively
   useEffect(() => {
@@ -854,7 +889,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
 
       {/* Progress Bar Section */}
       {showProgress && (
-        <div className="col-span-full mt-6">
+        <div className="col-span-full mt-6" ref={progressBottomRef}>
           <div 
             className="p-6 rounded-2xl"
             style={{
