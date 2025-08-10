@@ -300,12 +300,17 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
     setIsDownloadStarted(false); // Reset download started flag
     startProgress("Gathering Video Metadata...");
     setStatus("Gathering Video Metadata...");
+    // Normalize URL for API calls: prepend https:// when missing
+    const urlForFetch = (() => {
+      const s = (ytUrl || '').trim();
+      return /^https?:\/\//i.test(s) ? s : (s ? `https://${s}` : s);
+    })();
     
     try {
       
       // First, check video duration
       try {
-        const durationRes = await fetchWithTimeout(`/api/youtube/duration?url=${encodeURIComponent(ytUrl)}`);
+        const durationRes = await fetchWithTimeout(`/api/youtube/duration?url=${encodeURIComponent(urlForFetch)}`);
         
         if (durationRes.ok) {
           const durationData = await durationRes.json();
@@ -352,7 +357,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
       // Get video title before downloading
       let videoName = "Imported Audio";
       try {
-        const titleRes = await fetchWithTimeout(`/api/youtube/title?url=${encodeURIComponent(ytUrl)}`);
+        const titleRes = await fetchWithTimeout(`/api/youtube/title?url=${encodeURIComponent(urlForFetch)}`);
         
         if (titleRes.ok) {
           const titleData = await titleRes.json();
@@ -493,7 +498,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ 
-          url: ytUrl,
+          url: urlForFetch,
           name: "imported_video" // Add the required name parameter
         }),
       }, 30000); // 30 second timeout for the main download request

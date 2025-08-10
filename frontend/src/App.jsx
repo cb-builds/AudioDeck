@@ -150,7 +150,7 @@ function App() {
             <img 
               src="/AudioDeck Logo 2.PNG" 
               alt="AudioDeck Logo" 
-              className="w-[3.75rem] h-[3.75rem]"
+              className="w-[3rem] h-[3rem]"
               style={{
                 filter: 'drop-shadow(0 8px 16px rgba(0, 0, 0, 0.7))',
                 marginRight: '-1px'
