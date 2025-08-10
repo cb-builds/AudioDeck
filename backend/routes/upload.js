@@ -3,6 +3,7 @@ const router = express.Router();
 const path = require("path");
 const fs = require("fs");
 const { exec } = require("child_process");
+const { writeExpiryMeta } = require("../utils/expiry");
 
 const CLIPS_DIR = path.join(__dirname, "../clips");
 
@@ -83,11 +84,14 @@ router.post("/", (req, res) => {
             console.log("ffmpeg stderr:", durationStderr);
           }
           
+          // Write expiry metadata
+          const meta = writeExpiryMeta(savePath, { originalFilename });
           res.json({ 
             message: "Video file uploaded and audio extracted", 
             filename,
             videoDuration: videoDuration,
-            originalFilename: originalFilename
+            originalFilename: originalFilename,
+            expiryAt: meta.expiryAt
           });
         });
       });
@@ -119,10 +123,13 @@ router.post("/", (req, res) => {
           console.log("ffmpeg stderr:", durationStderr);
         }
         
+        // Write expiry metadata
+        const meta = writeExpiryMeta(savePath, { originalFilename });
         res.json({ 
           message: "Audio file uploaded", 
           filename,
-          videoDuration: videoDuration
+          videoDuration: videoDuration,
+          expiryAt: meta.expiryAt
         });
       });
     }

@@ -298,8 +298,8 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
       onExternalUploadStarted();
     }
     setIsDownloadStarted(false); // Reset download started flag
-    startProgress("Gathering Audio Metadata...");
-    setStatus("Gathering Audio Metadata...");
+    startProgress("Gathering Video Metadata...");
+    setStatus("Gathering Video Metadata...");
     
     try {
       
@@ -347,7 +347,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
       
       // Progress: 10% after duration check
       animateProgressTo(10);
-      setProgressText("Gathering Audio Metadata...");
+      setProgressText("Gathering Video Metadata...");
       
       // Get video title before downloading
       let videoName = "Imported Audio";
@@ -482,7 +482,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
       
       // Progress: 20% after title extraction
       animateProgressTo(20);
-      setProgressText("Gathering Audio Metadata...");
+      setProgressText("Preparing Upload...");
       
       // Store the video name in state for use in SSE handler
       setCurrentAudioName(videoName);
@@ -544,8 +544,8 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
         startProgressTracking(data.downloadId, videoName);
       } else {
         // Fallback to simulated progress
-        updateProgress(75, "Processing audio...");
-        setStatus("Processing audio...");
+        updateProgress(75, "Preparing audio...");
+        setStatus("Preparing audio...");
       }
       
       // Truncate video name for display
@@ -586,7 +586,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
       es.onopen = () => {
         console.log('SSE connection opened successfully');
         animateProgressTo(30);
-        setProgressText("Preparing Download...");
+        setProgressText("Preparing Upload...");
       };
       let completionHandled = false;
       let errorHandled = false;
@@ -619,14 +619,14 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
               return;
             }
             if (downloadedBytes === 0 && totalBytes === 0) {
-              setProgressText("Preparing Download...");
-              setStatus("Preparing Download...");
+              setProgressText("Preparing Upload...");
+              setStatus("Preparing Upload...");
             } else {
               if (!isDownloadStarted) setIsDownloadStarted(true);
               const mappedProgress = Math.min(100, 30 + (progress * 0.7));
               animateProgressTo(mappedProgress);
-              setProgressText("Downloading...");
-              setStatus("Downloading...");
+              setProgressText(mappedProgress > 83 ? "Preparing audio..." : "Uploading...");
+              setStatus("Uploading...");
             }
             if ((progress >= 100 || status === 'complete') && !completionHandled && !errorHandled) {
               completionHandled = true;
@@ -676,7 +676,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
       console.log('WebSocket connection opened successfully');
       wsOpened = true;
       animateProgressTo(30);
-      setProgressText("Preparing Download...");
+      setProgressText("Preparing Upload...");
     };
 
     let completionHandled = false;
@@ -712,14 +712,14 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
             return;
           }
           if (downloadedBytes === 0 && totalBytes === 0) {
-            setProgressText("Preparing Download...");
-            setStatus("Preparing Download...");
+            setProgressText("Preparing Upload...");
+            setStatus("Preparing Upload...");
           } else {
             if (!isDownloadStarted) setIsDownloadStarted(true);
             const mappedProgress = Math.min(100, 30 + (progress * 0.7));
             animateProgressTo(mappedProgress);
-            setProgressText("Downloading...");
-            setStatus("Downloading...");
+            setProgressText(mappedProgress > 83 ? "Preparing audio..." : "Uploading...");
+            setStatus("Uploading...");
           }
           if ((progress >= 100 || status === 'complete') && !completionHandled && !errorHandled) {
             completionHandled = true;
@@ -877,9 +877,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
             }}
           >
             {isVideoUploading ? (
-              <div className="flex items-center justify-center">
-                Downloading...
-              </div>
+              <div className="flex items-center justify-center">Uploading...</div>
             ) : (
               "Upload from Video Platform"
             )}

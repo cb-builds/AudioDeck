@@ -3,6 +3,7 @@ const router = express.Router();
 const path = require("path");
 const { exec } = require("child_process");
 const fs = require("fs");
+const { writeExpiryMeta } = require("../utils/expiry");
 
 const CLIPS_DIR = path.join(__dirname, "../clips");
 
@@ -43,7 +44,8 @@ router.post("/", (req, res) => {
     console.log("ffmpeg stdout:", stdout);
     if (stderr) console.log("ffmpeg stderr:", stderr);
 
-    res.json({ message: "Trimmed file saved", filename: path.basename(outputPath) });
+    const meta = writeExpiryMeta(outputPath, { originalFilename: newName });
+    res.json({ message: "Trimmed file saved", filename: path.basename(outputPath), expiryAt: meta.expiryAt });
   });
 });
 

@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const CLIPS_DIR = path.join(__dirname, "clips");
-const ONE_HOUR_MS = 60 * 60 * 1000; // 1 hour in milliseconds
+const { readExpiryMeta, ONE_HOUR_MS, getMetaPath } = require('./utils/expiry');
 const MAX_STORAGE_MB = 500; // Maximum storage in MB before forced cleanup
 
 function cleanupOldClips() {
@@ -40,11 +40,15 @@ function cleanupOldClips() {
     // Sort files by age (oldest first)
     fileStats.sort((a, b) => a.age - b.age);
 
-    // Delete files older than 1 hour
+    // Delete files past their expiryAt, falling back to 1 hour by age if meta missing
     fileStats.forEach(file => {
-      if (file.age > ONE_HOUR_MS) {
+      const meta = readExpiryMeta(file.path);
+      const expired = meta ? now >= meta.expiryAt : file.age > ONE_HOUR_MS;
+      if (expired) {
         try {
           fs.unlinkSync(file.path);
+          // Remove meta sidecar if present
+          try { fs.unlinkSync(getMetaPath(file.path)); } catch (_) {}
           deletedCount++;
           totalSize += file.size;
           currentStorageSize -= file.size;
@@ -66,6 +70,7 @@ function cleanupOldClips() {
         
         try {
           fs.unlinkSync(file.path);
+          try { fs.unlinkSync(getMetaPath(file.path)); } catch (_) {}
           deletedCount++;
           totalSize += file.size;
           currentStorageSize -= file.size;
