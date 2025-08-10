@@ -9,6 +9,7 @@ function App() {
   const [downloadComplete, setDownloadComplete] = useState(false);
   const [lockVideoPlatformButton, setLockVideoPlatformButton] = useState(false);
   const [resetInputsKey, setResetInputsKey] = useState(0);
+  const [isNarrowMobile, setIsNarrowMobile] = useState(false); // < 750px
 
   // Initialize Ko-fi widget
   useEffect(() => {
@@ -58,6 +59,20 @@ function App() {
     };
   }, []);
 
+  // Track viewport width to enable responsive behavior at 750px breakpoint
+  useEffect(() => {
+    const updateIsNarrow = () => {
+      try {
+        if (typeof window !== 'undefined') {
+          setIsNarrowMobile(window.innerWidth < 750);
+        }
+      } catch (_) {}
+    };
+    updateIsNarrow();
+    window.addEventListener('resize', updateIsNarrow);
+    return () => window.removeEventListener('resize', updateIsNarrow);
+  }, []);
+
   const handleFileUploaded = (filename, originalName, duration = 0) => {
     setUploadedFile(filename);
     setOriginalFileName(originalName);
@@ -86,6 +101,17 @@ function App() {
   const handleWaveformReady = () => {
     // Still fine to unlock here as well; App will already unlock on download complete
     setLockVideoPlatformButton(false);
+  };
+
+  const handleStartOver = () => {
+    // Reset all state as if a new session
+    setUploadedFile(null);
+    setOriginalFileName("");
+    setVideoDuration(0);
+    setDownloadComplete(false);
+    setLockVideoPlatformButton(false);
+    // Also clear any inputs in UploadForm when it reappears
+    setResetInputsKey((k) => k + 1);
   };
 
   return (
@@ -127,13 +153,15 @@ function App() {
 
         {/* Main Content */}
         <div className="space-y-8">
-          <UploadForm 
-            onFileUploaded={handleFileUploaded} 
-            onDownloadComplete={handleDownloadComplete}
-            onExternalUploadStarted={handleExternalUploadStarted}
-            lockVideoPlatformButton={lockVideoPlatformButton}
-            resetInputsKey={resetInputsKey}
-          />
+          {!(isNarrowMobile && uploadedFile && downloadComplete) && (
+            <UploadForm 
+              onFileUploaded={handleFileUploaded} 
+              onDownloadComplete={handleDownloadComplete}
+              onExternalUploadStarted={handleExternalUploadStarted}
+              lockVideoPlatformButton={lockVideoPlatformButton}
+              resetInputsKey={resetInputsKey}
+            />
+          )}
           
           {uploadedFile && downloadComplete && (
             <TrimEditor 
@@ -142,6 +170,8 @@ function App() {
               originalFileName={originalFileName} 
               expectedDuration={videoDuration}
               onWaveformReady={handleWaveformReady}
+              showStartOver={isNarrowMobile}
+              onStartOver={handleStartOver}
             />
           )}
         </div>

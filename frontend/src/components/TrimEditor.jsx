@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import WaveSurfer from "wavesurfer.js";
 import RegionsPlugin from "wavesurfer.js/dist/plugins/regions";
 
-export default function TrimEditor({ clip, originalFileName, expectedDuration = 0, onWaveformReady }) {
+export default function TrimEditor({ clip, originalFileName, expectedDuration = 0, onWaveformReady, showStartOver = false, onStartOver }) {
   const containerRef = useRef(null);
   const wavesurferRef = useRef(null);
   const regionsRef = useRef(null);
@@ -1070,7 +1070,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
 
   return (
     <div 
-      className="space-y-6"
+      className="space-y-6 relative"
       style={{
         background: '#14162B',
         borderRadius: '1.5rem',
@@ -1079,6 +1079,18 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
         border: '1px solid rgba(167, 139, 250, 0.1)'
       }}
     >
+      {showStartOver && typeof onStartOver === 'function' && (
+        <button
+          onClick={onStartOver}
+          className="absolute top-4 right-4 px-4 py-2 rounded-lg font-semibold text-white transition-all duration-300 transform hover:scale-105"
+          style={{
+            background: 'linear-gradient(135deg, #A44EFF, #427BFF)',
+            boxShadow: '0 4px 15px rgba(164, 78, 255, 0.3)'
+          }}
+        >
+          Start Over
+        </button>
+      )}
       {/* Header */}
       <div className="mb-6">
         {/* Small layout: icon + label on its own line, then filename, then description */}
