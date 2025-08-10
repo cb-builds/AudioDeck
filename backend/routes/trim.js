@@ -20,10 +20,28 @@ router.post("/", (req, res) => {
     return res.status(404).json({ error: "Input file not found." });
   }
 
-  const cmd = `ffmpeg -y -i "${inputPath}" -ss ${startTime} -to ${endTime} -c copy "${outputPath}"`;
+  // Calculate duration for more precise trimming
+  const duration = (parseFloat(endTime) - parseFloat(startTime)).toFixed(6);
+  const startTimeFormatted = parseFloat(startTime).toFixed(6);
+  
+  // Use a two-pass approach for maximum precision:
+  // 1. Fast seek to approximately the right position
+  // 2. Then precise trimming with re-encoding
+  const cmd = `ffmpeg -y -i "${inputPath}" -ss ${startTimeFormatted} -t ${duration} -acodec libmp3lame -ab 192k "${outputPath}"`;
 
-  exec(cmd, (err) => {
-    if (err) return res.status(500).json({ error: "ffmpeg trim failed", details: err.message });
+  console.log("Trim command:", cmd);
+  console.log("Input values:", { startTime, endTime, duration, startTimeFormatted });
+
+  exec(cmd, (err, stdout, stderr) => {
+    if (err) {
+      console.error("ffmpeg trim error:", err);
+      console.error("ffmpeg stderr:", stderr);
+      return res.status(500).json({ error: "ffmpeg trim failed", details: err.message });
+    }
+
+    console.log("ffmpeg trim successful");
+    console.log("ffmpeg stdout:", stdout);
+    if (stderr) console.log("ffmpeg stderr:", stderr);
 
     res.json({ message: "Trimmed file saved", filename: path.basename(outputPath) });
   });

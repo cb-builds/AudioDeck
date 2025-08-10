@@ -9,7 +9,7 @@ A modern web application for creating audio clips from various video platforms. 
 
 ## Features ✨
 
-- **Multi-Platform Support**: Download audio from YouTube, TikTok, and Twitch
+- **Multi-Platform Support**: Download audio from YouTube, TikTok, Twitch, Twitter/X, and Kick
 - **File Upload**: Upload local audio files (MP3, WAV, M4A, FLAC)
 - **Smart Limits**: 20-minute duration limit and 25MB file size limit
 - **Auto Cleanup**: Automatic deletion of old clips after 1 hour
@@ -35,6 +35,7 @@ Before running AudioDeck, make sure you have:
 
 - **Node.js** (v16 or higher)
 - **npm** or **yarn**
+- **Python** (v3.7 or higher)
 - **ffmpeg** installed and available in PATH
 - **yt-dlp** installed and available in PATH
 
@@ -53,8 +54,9 @@ sudo apt update
 sudo apt install ffmpeg
 ```
 
-#### yt-dlp
+#### yt-dlp and Python Dependencies
 ```bash
+# Install yt-dlp
 # Windows (using chocolatey)
 choco install yt-dlp
 
@@ -64,6 +66,9 @@ brew install yt-dlp
 # Ubuntu/Debian
 sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
 sudo chmod a+rx /usr/local/bin/yt-dlp
+
+# Install Python dependencies for enhanced platform support
+pip install -r requirements.txt
 ```
 
 ## Installation 🚀
@@ -95,6 +100,9 @@ The `docker-compose.yml` file can be found [here](https://github.com/cb-builds/A
 
 2. **Install dependencies**
    ```bash
+   # Install Python dependencies (required for enhanced platform support)
+   pip install -r requirements.txt
+   
    # Install backend dependencies
    cd backend
    npm install
@@ -182,6 +190,8 @@ docker pull ghcr.io/cb-builds/audiodeck:latest
    - **YouTube**: Standard YouTube URLs
    - **TikTok**: TikTok video URLs
    - **Twitch**: Live streams, VODs, and clips
+   - **Twitter/X**: Video posts and clips
+   - **Kick**: Live streams and clips
 3. Click "Upload from Video Platform"
 4. Audio will be downloaded and converted automatically
 

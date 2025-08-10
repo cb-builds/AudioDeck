@@ -20,6 +20,10 @@ RUN wget https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -O /us
 COPY package*.json ./
 COPY backend/package*.json ./backend/
 COPY frontend/package*.json ./frontend/
+COPY requirements.txt ./
+
+# Install Python dependencies
+RUN pip3 install --break-system-packages -r requirements.txt
 
 # Install dependencies
 RUN npm install -g concurrently

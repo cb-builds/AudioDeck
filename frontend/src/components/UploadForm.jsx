@@ -1,7 +1,7 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { truncateText } from "../utils/textUtils";
 
-const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
+const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarted, lockVideoPlatformButton, resetInputsKey }) => {
   const [file, setFile] = useState(null);
   const [ytUrl, setYtUrl] = useState("");
   const [status, setStatus] = useState("");
@@ -14,13 +14,21 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
   const [showProgress, setShowProgress] = useState(false);
   const [progressValue, setProgressValue] = useState(0);
   const [progressText, setProgressText] = useState("");
-  const [currentVideoName, setCurrentVideoName] = useState("");
+  const [currentAudioName, setCurrentAudioName] = useState("");
   const [activeSSEConnections, setActiveSSEConnections] = useState(new Set());
   const [isDownloadStarted, setIsDownloadStarted] = useState(false);
 
   const progressAnimRef = useRef(null);
   const targetProgressRef = useRef(0);
   const currentProgressRef = useRef(0);
+
+  // Reset inputs when requested by parent (e.g., when TrimEditor appears)
+  useEffect(() => {
+    setFile(null);
+    setYtUrl("");
+    const fileEl = document.getElementById('file-upload');
+    if (fileEl) fileEl.value = "";
+  }, [resetInputsKey]);
 
   const PROGRESS_TICK_MS = 120; // tick for visible number-by-number
   const PROGRESS_STEP_PERCENT = 1.5; // ~3x faster than 0.5% per tick
@@ -170,6 +178,9 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
   const handleFileUpload = async (fileToUpload = file) => {
     if (!fileToUpload) return setStatus("No file selected.");
     
+    if (typeof onExternalUploadStarted === 'function') {
+      onExternalUploadStarted();
+    }
     startProgress("Uploading file...");
     
     const formData = new FormData();
@@ -231,11 +242,14 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
   };
 
   const handleYoutubeDownload = async () => {
-    if (!ytUrl) return setStatus("Please enter a video URL.");
+    if (!ytUrl) return setStatus("Please enter an audio/video URL.");
     setIsVideoUploading(true);
+    if (typeof onExternalUploadStarted === 'function') {
+      onExternalUploadStarted();
+    }
     setIsDownloadStarted(false); // Reset download started flag
-    startProgress("Gathering Video Metadata...");
-    setStatus("Gathering Video Metadata...");
+    startProgress("Gathering Audio Metadata...");
+    setStatus("Gathering Audio Metadata...");
     
     try {
       
@@ -283,28 +297,28 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       
       // Progress: 10% after duration check
       animateProgressTo(10);
-      setProgressText("Gathering Video Metadata...");
+      setProgressText("Gathering Audio Metadata...");
       
       // Get video title before downloading
-      let videoName = "Imported Video";
+      let videoName = "Imported Audio";
       try {
         const titleRes = await fetchWithTimeout(`/api/youtube/title?url=${encodeURIComponent(ytUrl)}`);
         
         if (titleRes.ok) {
           const titleData = await titleRes.json();
-          videoName = titleData.title || "Imported Video";
+          videoName = titleData.title || "Imported Audio";
         } else {
           // Fallback to platform-specific naming
           if (ytUrl.includes('youtube.com/') || ytUrl.includes('youtu.be/')) {
             const videoId = ytUrl.includes('v=') ? ytUrl.split('v=')[1]?.split('&')[0] : 
                            ytUrl.includes('youtu.be/') ? ytUrl.split('youtu.be/')[1]?.split('?')[0] : '';
-            videoName = videoId ? `YouTube Video (${videoId})` : "YouTube Video";
+            videoName = videoId ? `YouTube Audio (${videoId})` : "YouTube Audio";
           } else if (ytUrl.includes('tiktok.com/')) {
             const tiktokMatch = ytUrl.match(/tiktok\.com\/@[^\/]+\/video\/(\d+)/);
             if (tiktokMatch) {
-              videoName = `TikTok Video (${tiktokMatch[1]})`;
+              videoName = `TikTok Audio (${tiktokMatch[1]})`;
             } else {
-              videoName = "TikTok Video";
+              videoName = "TikTok Audio";
             }
           } else if (ytUrl.includes('twitch.tv/')) {
             // Extract Twitch streamer name, video ID, or clip ID
@@ -330,8 +344,27 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
                   videoName = `Twitch Stream (${streamer})`;
                 }
               } else {
-                videoName = "Twitch Video";
+                videoName = "Twitch Audio";
               }
+            }
+          } else if (ytUrl.includes('twitter.com/') || ytUrl.includes('x.com/')) {
+            // Extract Twitter/X post information
+            const twitterMatch = ytUrl.match(/(?:twitter\.com|x\.com)\/([^\/]+)\/status\/(\d+)/);
+            if (twitterMatch) {
+              const username = twitterMatch[1];
+              const tweetId = twitterMatch[2];
+              videoName = `Twitter Post (${username} - ${tweetId})`;
+            } else {
+              videoName = "Twitter Post";
+            }
+          } else if (ytUrl.includes('kick.com/')) {
+            // Extract Kick streamer information
+            const kickMatch = ytUrl.match(/kick\.com\/([^\/\?]+)/);
+            if (kickMatch) {
+              const streamer = kickMatch[1];
+              videoName = `Kick Stream (${streamer})`;
+            } else {
+              videoName = "Kick Stream";
             }
           }
         }
@@ -340,13 +373,13 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
         if (ytUrl.includes('youtube.com/') || ytUrl.includes('youtu.be/')) {
           const videoId = ytUrl.includes('v=') ? ytUrl.split('v=')[1]?.split('&')[0] : 
                          ytUrl.includes('youtu.be/') ? ytUrl.split('youtu.be/')[1]?.split('?')[0] : '';
-          videoName = videoId ? `YouTube Video (${videoId})` : "YouTube Video";
+          videoName = videoId ? `YouTube Audio (${videoId})` : "YouTube Audio";
         } else if (ytUrl.includes('tiktok.com/')) {
           const tiktokMatch = ytUrl.match(/tiktok\.com\/@[^\/]+\/video\/(\d+)/);
           if (tiktokMatch) {
-            videoName = `TikTok Video (${tiktokMatch[1]})`;
+            videoName = `TikTok Audio (${tiktokMatch[1]})`;
           } else {
-            videoName = "TikTok Video";
+            videoName = "TikTok Audio";
           }
         } else if (ytUrl.includes('twitch.tv/')) {
           // Extract Twitch streamer name, video ID, or clip ID
@@ -372,18 +405,37 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
                 videoName = `Twitch Stream (${streamer})`;
               }
             } else {
-              videoName = "Twitch Video";
+              videoName = "Twitch Audio";
             }
+          }
+        } else if (ytUrl.includes('twitter.com/') || ytUrl.includes('x.com/')) {
+          // Extract Twitter/X post information
+          const twitterMatch = ytUrl.match(/(?:twitter\.com|x\.com)\/([^\/]+)\/status\/(\d+)/);
+          if (twitterMatch) {
+            const username = twitterMatch[1];
+            const tweetId = twitterMatch[2];
+            videoName = `Twitter Post (${username} - ${tweetId})`;
+          } else {
+            videoName = "Twitter Post";
+          }
+        } else if (ytUrl.includes('kick.com/')) {
+          // Extract Kick streamer information
+          const kickMatch = ytUrl.match(/kick\.com\/([^\/\?]+)/);
+          if (kickMatch) {
+            const streamer = kickMatch[1];
+            videoName = `Kick Stream (${streamer})`;
+          } else {
+            videoName = "Kick Stream";
           }
         }
       }
       
       // Progress: 20% after title extraction
       animateProgressTo(20);
-      setProgressText("Gathering Video Metadata...");
+      setProgressText("Gathering Audio Metadata...");
       
       // Store the video name in state for use in SSE handler
-      setCurrentVideoName(videoName);
+      setCurrentAudioName(videoName);
       
       const res = await fetchWithTimeout("/api/youtube", {
         method: "POST",
@@ -464,8 +516,9 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       } else {
         setStatus(`Video upload failed: ${err.message}`);
       }
-    } finally {
       setIsVideoUploading(false);
+    } finally {
+      // Do not clear isVideoUploading here; it will be cleared on SSE/WS completion
     }
   };
 
@@ -534,6 +587,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
                 hideProgress();
                 try { es.close(); } catch (_) {}
                 setActiveSSEConnections(prev => { const s=new Set(prev); s.delete(downloadId); return s; });
+                setIsVideoUploading(false);
               }, 2000);
             }
           }
@@ -627,6 +681,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
               hideProgress();
               try { ws.close(); } catch (_) {}
               setActiveSSEConnections(prev => { const s=new Set(prev); s.delete(downloadId); return s; });
+              setIsVideoUploading(false);
             }, 2000);
           }
         }
@@ -708,8 +763,9 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
           </div>
           
           <button
-            onClick={handleReupload}
-            className="w-full py-3 px-6 rounded-xl font-semibold text-white transition-all duration-300 transform hover:scale-105"
+            onClick={triggerFileSelect}
+            disabled={lockVideoPlatformButton}
+            className="w-full py-3 px-6 rounded-xl font-semibold text-white transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               background: 'linear-gradient(135deg, #A44EFF, #427BFF)',
               boxShadow: '0 4px 15px rgba(164, 78, 255, 0.3)'
@@ -738,7 +794,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
               background: 'linear-gradient(135deg, #36D1DC, #5B86E5)'
             }}
           >
-            <span className="text-white text-lg">🎥</span>
+            <span className="text-white text-lg">🎵</span>
           </div>
           <h2 className="text-xl font-semibold text-white">Upload from Video Platform</h2>
         </div>
@@ -747,7 +803,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
           <div className="flex-1 flex items-center">
             <input
               type="text"
-              placeholder="Video URL (YouTube, TikTok, Twitch)"
+              placeholder="Video URL (YouTube, TikTok, Twitch, etc...)"
               value={ytUrl}
               onChange={(e) => setYtUrl(e.target.value)}
               className="w-full p-4 rounded-xl text-white placeholder-gray-500 transition-all duration-300 focus:outline-none focus:ring-2"
@@ -761,7 +817,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
           
           <button
             onClick={handleYoutubeDownload}
-            disabled={!ytUrl || isVideoUploading}
+            disabled={!ytUrl || isVideoUploading || lockVideoPlatformButton}
             className="w-full py-3 px-6 rounded-xl font-semibold text-white transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               background: 'linear-gradient(135deg, #36D1DC, #5B86E5)',

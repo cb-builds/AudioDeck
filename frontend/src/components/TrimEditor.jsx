@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import WaveSurfer from "wavesurfer.js";
 import RegionsPlugin from "wavesurfer.js/dist/plugins/regions";
 
-export default function TrimEditor({ clip, originalFileName, expectedDuration = 0 }) {
+export default function TrimEditor({ clip, originalFileName, expectedDuration = 0, onWaveformReady }) {
   const containerRef = useRef(null);
   const wavesurferRef = useRef(null);
   const regionsRef = useRef(null);
@@ -31,6 +31,19 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
+      // Destroy any existing wavesurfer instance on unmount
+      try {
+        if (wavesurferRef.current) {
+          wavesurferRef.current.destroy();
+          wavesurferRef.current = null;
+        }
+        if (containerRef.current) {
+          containerRef.current.innerHTML = "";
+        }
+      } catch (_) {}
+      if (progressTimerRef.current) {
+        clearInterval(progressTimerRef.current);
+      }
     };
   }, []);
 
@@ -99,35 +112,32 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
               initializeWaveSurfer();
             }
           } else {
-            console.log(`File too small (${contentLength} bytes), retry ${retryCount}/${maxRetries}`);
             setTimeout(checkDownloadComplete, 1000);
           }
         } else {
-          console.log(`File not found, retry ${retryCount}/${maxRetries}`);
           setTimeout(checkDownloadComplete, 1000);
         }
-      } catch (error) {
-        console.log(`Error checking file, retry ${retryCount}/${maxRetries}:`, error);
+      } catch (err) {
+        console.error("HEAD request failed:", err);
         setTimeout(checkDownloadComplete, 1000);
       }
     };
 
-    // Start checking after a longer delay to ensure file is fully processed
-    const timer = setTimeout(checkDownloadComplete, 5000); // Increased from 2000 to 5000
-
-    return () => {
-      clearTimeout(timer);
-      if (wavesurferRef.current) {
-        wavesurferRef.current.destroy();
-      }
-    };
-  }, [clip]);
+    checkDownloadComplete();
+  }, [clip, expectedDuration]);
 
   // Function to initialize WaveSurfer
   const initializeWaveSurfer = () => {
-    if (wavesurferRef.current) {
-      wavesurferRef.current.destroy();
-    }
+    // Ensure previous instance is fully destroyed and container cleared
+    try {
+      if (wavesurferRef.current) {
+        wavesurferRef.current.destroy();
+        wavesurferRef.current = null;
+      }
+      if (containerRef.current) {
+        containerRef.current.innerHTML = "";
+      }
+    } catch (_) {}
 
     // Get container width for zoom calculations
     if (containerRef.current) {
@@ -143,7 +153,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
     const wavesurfer = WaveSurfer.create({
       container: containerRef.current,
       waveColor: "#A44EFF", // Design system primary color - keep purple
-      progressColor: "#70FFEA", // Design system selected color - blue progress
+      progressColor: "transparent", // Hide progress/marker until playback starts
       height: 150, // Increased height
       url: `/clips/${clip}`, // Use relative URL to work on any server
       interact: false, // Disable default interactions
@@ -154,7 +164,6 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
       mediaControls: false, // Disable media controls
       responsive: true, // Make it responsive
       normalize: true, // Normalize audio for better visualization
-      // Add debugging for file loading
       onloaderror: (error) => {
         console.error("WaveSurfer load error:", error);
       },
@@ -847,8 +856,8 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
     try {
       const requestBody = {
         filename: clip,
-        startTime: start.toFixed(2),
-        endTime: end.toFixed(2),
+        startTime: start.toFixed(6),
+        endTime: end.toFixed(6),
         newName,
       };
       
@@ -959,8 +968,8 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
       // First, save the trimmed file
       const trimRequestBody = {
         filename: clip,
-        startTime: start.toFixed(2),
-        endTime: end.toFixed(2),
+        startTime: start.toFixed(6),
+        endTime: end.toFixed(6),
         newName: newName || 'trimmed'
       };
 
@@ -1013,18 +1022,20 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
 
     try {
       regionRef.current.remove();
-      const duration = wavesurferRef.current.getDuration();
+      const totalDuration = wavesurferRef.current.getDuration();
+      const start = Math.max(0, totalDuration * 0.25);
+      const end = Math.min(totalDuration, totalDuration * 0.75);
       const newRegion = regionsRef.current.addRegion({
-        start: 0,
-        end: duration,
+        start,
+        end,
         color: "rgba(135, 206, 250, 0.3)",
         drag: !shouldDisableDrag(),
         resize: true,
       });
       regionRef.current = newRegion;
-      setStartTime("0.00");
-      setEndTime(duration.toFixed(2));
-      setStatus("Region reset to full duration.");
+      setStartTime(start.toFixed(2));
+      setEndTime(end.toFixed(2));
+      setStatus("Region reset");
     } catch (error) {
       console.error("Error resetting region:", error);
       setStatus("Error resetting region: " + error.message);
@@ -1095,7 +1106,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
               boxShadow: '0 4px 15px rgba(164, 78, 255, 0.3)'
             }}
           >
-            ⬇
+            Download
           </button>
         </div>
       </div>
