@@ -1054,8 +1054,8 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
       }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6">
+        <div className="flex items-center flex-1 min-w-0">
           <div 
             className="w-12 h-12 rounded-full flex items-center justify-center mr-4"
             style={{
@@ -1064,8 +1064,10 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
           >
             <span className="text-white text-xl">✂️</span>
           </div>
-          <div>
-            <h2 className="text-2xl font-bold text-white">Trim Audio: {originalFileName || clip}</h2>
+          <div className="min-w-0">
+            <h2 className="text-2xl font-bold text-white truncate" title={originalFileName || clip}>
+              Trim Audio: {originalFileName || clip}
+            </h2>
             <p className="text-gray-400 text-sm">
               Drag to move selection, resize edges, or use timestamp inputs below
             </p>
@@ -1073,7 +1075,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
         </div>
         
         {/* Play Button in Header */}
-        <div className="flex gap-3">
+        <div className="flex gap-3 mt-4 lg:mt-0 w-full lg:w-auto justify-center lg:justify-end">
           <button
             onClick={handleReset}
             className="px-6 py-3 rounded-xl font-bold text-white transition-all duration-300 transform hover:scale-105"
@@ -1132,8 +1134,8 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
             border: '1px solid rgba(167, 139, 250, 0.2)'
           }}
         >
-          <div className="flex gap-4 items-center">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-row flex-nowrap gap-4 items-center justify-center lg:justify-start">
+            <div className="flex flex-col items-center lg:flex-row lg:items-center gap-1 lg:gap-3 text-center lg:text-left">
               <label className="text-sm text-gray-300 font-medium">Start Time (s):</label>
               <input
                 type="number"
@@ -1145,7 +1147,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
                   setStartTime(newStartTime);
                   updateRegionInRealTime(newStartTime, endTime);
                 }}
-                className="w-24 p-2 rounded-lg text-white font-mono"
+                className="w-28 lg:w-24 p-2 rounded-lg text-white font-mono"
                 style={{
                   background: '#1E203A',
                   border: '1px solid rgba(167, 139, 250, 0.3)'
@@ -1153,7 +1155,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
               />
             </div>
             
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col items-center lg:flex-row lg:items-center gap-1 lg:gap-3 text-center lg:text-left">
               <label className="text-sm text-gray-300 font-medium">End Time (s):</label>
               <input
                 type="number"
@@ -1165,7 +1167,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
                   setEndTime(newEndTime);
                   updateRegionInRealTime(startTime, newEndTime);
                 }}
-                className="w-24 p-2 rounded-lg text-white font-mono"
+                className="w-28 lg:w-24 p-2 rounded-lg text-white font-mono"
                 style={{
                   background: '#1E203A',
                   border: '1px solid rgba(167, 139, 250, 0.3)'
