@@ -153,7 +153,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
     const wavesurfer = WaveSurfer.create({
       container: containerRef.current,
       waveColor: "#A44EFF", // Design system primary color - keep purple
-      progressColor: "#70FFEA", // Design system selected color - blue progress
+      progressColor: "transparent", // Hide progress/marker until playback starts
       height: 150, // Increased height
       url: `/clips/${clip}`, // Use relative URL to work on any server
       interact: false, // Disable default interactions
@@ -1022,18 +1022,20 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
 
     try {
       regionRef.current.remove();
-      const duration = wavesurferRef.current.getDuration();
+      const totalDuration = wavesurferRef.current.getDuration();
+      const start = Math.max(0, totalDuration * 0.25);
+      const end = Math.min(totalDuration, totalDuration * 0.75);
       const newRegion = regionsRef.current.addRegion({
-        start: 0,
-        end: duration,
+        start,
+        end,
         color: "rgba(135, 206, 250, 0.3)",
         drag: !shouldDisableDrag(),
         resize: true,
       });
       regionRef.current = newRegion;
-      setStartTime("0.00");
-      setEndTime(duration.toFixed(2));
-      setStatus("Region reset to full duration.");
+      setStartTime(start.toFixed(2));
+      setEndTime(end.toFixed(2));
+      setStatus("Region reset");
     } catch (error) {
       console.error("Error resetting region:", error);
       setStatus("Error resetting region: " + error.message);
@@ -1104,7 +1106,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
               boxShadow: '0 4px 15px rgba(164, 78, 255, 0.3)'
             }}
           >
-            ⬇
+            Download
           </button>
         </div>
       </div>
