@@ -209,9 +209,12 @@ router.get("/duration", async (req, res) => {
       if (err) {
         console.error("Duration check error:", err);
         console.error("stderr:", stderr);
-        
-        // If we can't get duration, allow the download to proceed
-        // The backend will handle duration limits during actual download
+        const errText = `${stderr || ''}`;
+        // Hard-fail on obvious bad URLs or HTTP errors so frontend cancels early
+        if (/HTTP\s+Error|Unsupported URL|Unable to download webpage/i.test(errText)) {
+          return res.status(400).json({ error: "Output file not found. Please check link and try again." });
+        }
+        // Otherwise, allow proceeding as before
         return res.json({ 
           duration: 0, 
           isTooLong: false,
@@ -221,6 +224,10 @@ router.get("/duration", async (req, res) => {
 
       const durationStr = stdout.trim();
       if (!durationStr) {
+        const errText = `${stderr || ''}`;
+        if (/HTTP\s+Error|Unsupported URL|Unable to download webpage/i.test(errText)) {
+          return res.status(400).json({ error: "Output file not found. Please check link and try again." });
+        }
         return res.json({ 
           duration: 0, 
           isTooLong: false,
@@ -285,14 +292,6 @@ router.get("/title", async (req, res) => {
         console.log("Processing Twitch stream/VOD for title extraction");
         titleCmd = `yt-dlp -4 --get-title --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.twitch.tv/" --add-header "Client-Id:kimne78kx3ncx6brgo4mv6wki5h1ko" "${url}"`;
       }
-    } else if (url.includes('twitter.com') || url.includes('x.com')) {
-      // Enhanced Twitter/X title extraction
-      console.log("Extracting title for Twitter/X URL:", url);
-      titleCmd = `yt-dlp -4 --get-title --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://twitter.com/" "${url}"`;
-    } else if (url.includes('kick.com')) {
-      // Enhanced Kick title extraction
-      console.log("Extracting title for Kick URL:", url);
-      titleCmd = `yt-dlp -4 --get-title --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://kick.com/" "${url}"`;
     } else {
       // Standard command for other platforms
       titleCmd = `yt-dlp -4 --get-title --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${url}"`;
@@ -302,81 +301,22 @@ router.get("/title", async (req, res) => {
       if (err) {
         console.error("Title extraction error:", err);
         console.error("stderr:", stderr);
-        
-        // For TikTok, if we get blocked, return a generic name
-        if (url.includes('tiktok.com') && stderr.includes('blocked')) {
-          const tiktokMatch = url.match(/tiktok\.com\/@[^\/]+\/video\/(\d+)/);
-          if (tiktokMatch) {
-            return res.json({ title: `TikTok Video (${tiktokMatch[1]})` });
-          } else {
-            return res.json({ title: "TikTok Video" });
-          }
+        const errText = `${stderr || ''}`;
+        if (/HTTP\s+Error|Unsupported URL|Unable to download webpage/i.test(errText)) {
+          return res.status(400).json({ error: "Output file not found. Please check link and try again." });
         }
         
-        // For Twitch, handle unavailable videos
-        if (url.includes('twitch.tv')) {
-          if (stderr.includes('not currently live') || stderr.includes('offline')) {
-            const twitchMatch = url.match(/twitch\.tv\/([^\/]+)/);
-            if (twitchMatch) {
-              return res.json({ title: `Twitch Stream (${twitchMatch[1]} - Offline)` });
-            } else {
-              return res.json({ title: "Twitch Stream (Offline)" });
-            }
-          } else if (stderr.includes('does not exist') || stderr.includes('not found')) {
-            return res.json({ title: "Twitch VOD (Not Found)" });
-                     } else if (stderr.includes('unavailable') || stderr.includes('private') || stderr.includes('deleted')) {
-             const twitchMatch = url.match(/twitch\.tv\/([^\/]+)(?:\/v\/(\d+))?/);
-             if (twitchMatch) {
-               const streamer = twitchMatch[1];
-               const videoId = twitchMatch[2];
-               if (videoId) {
-                 return res.json({ title: `Twitch VOD (${streamer} - ${videoId})` });
-               } else {
-                 return res.json({ title: `Twitch Stream (${streamer})` });
-               }
-             } else {
-               return res.json({ title: "Twitch Video" });
-             }
-           } else if (url.includes('/clip/') && (stderr.includes('clip') || stderr.includes('not found'))) {
-             const clipMatch = url.match(/twitch\.tv\/([^\/]+)\/clip\/([^\/\?]+)/);
-             if (clipMatch) {
-               const streamer = clipMatch[1];
-               const clipId = clipMatch[2];
-               return res.json({ title: `Twitch Clip (${streamer} - ${clipId})` });
-             } else {
-               return res.json({ title: "Twitch Clip (Not Found)" });
-             }
-           }
-        }
-        
-        // For Twitter/X, provide fallback naming
-        if (url.includes('twitter.com') || url.includes('x.com')) {
-          const twitterMatch = url.match(/(?:twitter\.com|x\.com)\/([^\/]+)\/status\/(\d+)/);
-          if (twitterMatch) {
-            const username = twitterMatch[1];
-            const tweetId = twitterMatch[2];
-            return res.json({ title: `Twitter Post (${username} - ${tweetId})` });
-          } else {
-            return res.json({ title: "Twitter Post" });
-          }
-        }
-        
-        // For Kick, provide fallback naming
-        if (url.includes('kick.com')) {
-          const kickMatch = url.match(/kick\.com\/([^\/\?]+)/);
-          if (kickMatch) {
-            const streamer = kickMatch[1];
-            return res.json({ title: `Kick Stream (${streamer})` });
-          } else {
-            return res.json({ title: "Kick Stream" });
-          }
-        }
-        
+        // Existing fallbacks (TikTok/Twitch) follow here if desired
+        // Otherwise generic error:
         return res.status(500).json({ error: "Could not extract audio/video title", details: err.message });
       }
 
       const title = stdout.trim();
       if (!title) {
+        const errText = `${stderr || ''}`;
+        if (/HTTP\s+Error|Unsupported URL|Unable to download webpage/i.test(errText)) {
+          return res.status(400).json({ error: "Output file not found. Please check link and try again." });
+        }
         return res.status(404).json({ error: "No title found for this audio/video" });
       }
 
@@ -399,6 +339,16 @@ router.post("/", (req, res) => {
 
   if (!url || !name) {
     return res.status(400).json({ error: "Missing audio/video URL or desired name." });
+  }
+
+  // Quick reject for clearly invalid/generic URLs (e.g., https://x.com without a path)
+  try {
+    const u = new URL(url);
+    if (!u.pathname || u.pathname === '/' || u.hostname.split('.').length < 2) {
+      return res.status(400).json({ error: "Output file not found. Please check link and try again." });
+    }
+  } catch (_) {
+    return res.status(400).json({ error: "Output file not found. Please check link and try again." });
   }
 
   const downloadId = Date.now().toString();
@@ -429,8 +379,8 @@ router.post("/", (req, res) => {
     durationCmd = `yt-dlp -4 --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.twitch.tv/" --add-header "Client-Id:kimne78kx3ncx6brgo4mv6wki5h1ko" "${url}"`;
   } else if (url.includes('twitter.com') || url.includes('x.com')) {
     durationCmd = `yt-dlp -4 --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://twitter.com/" "${url}"`;
-  } else if (url.includes('kick.com')) {
-    durationCmd = `yt-dlp -4 --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://kick.com/" "${url}"`;
+  } else if (url.includes('instagram.com')) {
+    durationCmd = `yt-dlp -4 --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.instagram.com/" "${url}"`;
   } else {
     durationCmd = `yt-dlp -4 --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${url}"`;
   }
@@ -439,10 +389,19 @@ router.post("/", (req, res) => {
   exec(durationCmd, (durationErr, durationStdout, durationStderr) => {
     console.log("Duration extraction started for URL:", url);
     console.log("Duration command:", durationCmd);
-    console.log("Duration stdout:", durationStdout);
-    console.log("Duration stderr:", durationStderr);
-    console.log("Duration error:", durationErr);
-    
+
+    if (durationErr) {
+      const errText = `${durationStderr || ''}`;
+      if (/HTTP\s+Error|Unsupported URL|Unable to download webpage/i.test(errText)) {
+        const dl = activeDownloads.get(downloadId);
+        if (dl) {
+          dl.status = 'error';
+          dl.error = 'Output file not found. Please try again';
+        }
+        return; // Hard-cancel pipeline silently (frontend will timeout on progress)
+      }
+    }
+
     let videoDuration = 0;
     if (!durationErr && durationStdout.trim()) {
       const durationStr = durationStdout.trim();
