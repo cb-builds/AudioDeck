@@ -1069,16 +1069,26 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
       const trimData = await trimRes.json();
       console.log("Trim successful:", trimData);
 
-      // Now download the saved file
-              const downloadRes = await fetch(`/clips/${trimData.filename}`, {
-        method: "GET",
-      });
+      // Fetch the trimmed file
+      const downloadRes = await fetch(`/clips/${trimData.filename}`, { method: "GET" });
+      if (!downloadRes.ok) throw new Error('Download failed');
+      const blob = await downloadRes.blob();
 
-      if (!downloadRes.ok) {
-        throw new Error('Download failed');
+      // On iOS/Android, prefer Web Share API Level 2 to share the file itself
+      const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent || "");
+      if (isMobile) {
+        try {
+          const shareFileName = `${(newName || 'trimmed').replace(/[^\w\-\.]+/g, '_')}.mp3`;
+          const file = new File([blob], shareFileName, { type: 'audio/mpeg', lastModified: Date.now() });
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({ title: 'AudioDeck Clip', files: [file] });
+            setStatus('Shared successfully');
+            return;
+          }
+        } catch (_) {}
       }
 
-      const blob = await downloadRes.blob();
+      // Default: trigger download
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -1282,19 +1292,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
               Download
             </button>
 
-            <button
-              onClick={handleShare}
-              aria-label="Share"
-              title="Share"
-              className="px-4 py-3 rounded-xl font-semibold text-white transition-all duration-300 transform hover:scale-105"
-              style={{
-                background: 'linear-gradient(135deg, #A44EFF, #427BFF)',
-                boxShadow: '0 4px 15px rgba(164, 78, 255, 0.3)'
-              }}
-              disabled={!isReady || !regionRef.current}
-            >
-              ⋮
-            </button>
+            {/* Share button removed; Download will invoke Web Share on mobile */}
           </div>
         </div>
 
@@ -1335,19 +1333,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
             Download
           </button>
 
-          <button
-            onClick={handleShare}
-            aria-label="Share"
-            title="Share"
-            className="px-4 py-3 rounded-xl font-semibold text-white transition-all duration-300 transform hover:scale-105"
-            style={{
-              background: 'linear-gradient(135deg, #A44EFF, #427BFF)',
-              boxShadow: '0 4px 15px rgba(164, 78, 255, 0.3)'
-            }}
-            disabled={!isReady || !regionRef.current}
-          >
-            ⋮
-          </button>
+          {/* Share button removed; Download will invoke Web Share on mobile */}
         </div>
       </div>
       
