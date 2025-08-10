@@ -20,6 +20,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
   const progressBottomRef = useRef(null);
   const [isNarrowMobile, setIsNarrowMobile] = useState(false); // < 750px
   const [isNarrowViewport, setIsNarrowViewport] = useState(false);
+  const ytInputRef = useRef(null);
 
   const progressAnimRef = useRef(null);
   const targetProgressRef = useRef(0);
@@ -291,8 +292,9 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
     }
   };
 
-  const handleYoutubeDownload = async () => {
-    if (!ytUrl) return setStatus("Please enter an audio/video URL.");
+  const handleYoutubeDownload = async (initialUrl) => {
+    const urlInput = (initialUrl ?? ytUrl) || "";
+    if (!urlInput) return setStatus("Please enter an audio/video URL.");
     setIsVideoUploading(true);
     if (typeof onExternalUploadStarted === 'function') {
       onExternalUploadStarted();
@@ -302,7 +304,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
     setStatus("Gathering Video Metadata...");
     // Normalize URL for API calls: prepend https:// when missing
     const urlForFetch = (() => {
-      const s = (ytUrl || '').trim();
+      const s = (urlInput || '').trim();
       return /^https?:\/\//i.test(s) ? s : (s ? `https://${s}` : s);
     })();
     
@@ -364,22 +366,22 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
           videoName = titleData.title || "Imported Audio";
         } else {
           // Fallback to platform-specific naming
-          if (ytUrl.includes('youtube.com/') || ytUrl.includes('youtu.be/')) {
-            const videoId = ytUrl.includes('v=') ? ytUrl.split('v=')[1]?.split('&')[0] : 
-                           ytUrl.includes('youtu.be/') ? ytUrl.split('youtu.be/')[1]?.split('?')[0] : '';
+          if (urlInput.includes('youtube.com/') || urlInput.includes('youtu.be/')) {
+            const videoId = urlInput.includes('v=') ? urlInput.split('v=')[1]?.split('&')[0] : 
+                           urlInput.includes('youtu.be/') ? urlInput.split('youtu.be/')[1]?.split('?')[0] : '';
             videoName = videoId ? `YouTube Audio (${videoId})` : "YouTube Audio";
-          } else if (ytUrl.includes('tiktok.com/')) {
-            const tiktokMatch = ytUrl.match(/tiktok\.com\/@[^\/]+\/video\/(\d+)/);
+          } else if (urlInput.includes('tiktok.com/')) {
+            const tiktokMatch = urlInput.match(/tiktok\.com\/@[^\/]+\/video\/(\d+)/);
             if (tiktokMatch) {
               videoName = `TikTok Audio (${tiktokMatch[1]})`;
             } else {
               videoName = "TikTok Audio";
             }
-          } else if (ytUrl.includes('twitch.tv/')) {
+          } else if (urlInput.includes('twitch.tv/')) {
             // Extract Twitch streamer name, video ID, or clip ID
-            if (ytUrl.includes('/clip/')) {
+            if (urlInput.includes('/clip/')) {
               // Handle Twitch clips
-              const clipMatch = ytUrl.match(/twitch\.tv\/([^\/]+)\/clip\/([^\/\?]+)/);
+              const clipMatch = urlInput.match(/twitch\.tv\/([^\/]+)\/clip\/([^\/\?]+)/);
               if (clipMatch) {
                 const streamer = clipMatch[1];
                 const clipId = clipMatch[2];
@@ -389,7 +391,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
               }
             } else {
               // Handle Twitch streams and VODs
-              const twitchMatch = ytUrl.match(/twitch\.tv\/([^\/]+)(?:\/v\/(\d+))?/);
+              const twitchMatch = urlInput.match(/twitch\.tv\/([^\/]+)(?:\/v\/(\d+))?/);
               if (twitchMatch) {
                 const streamer = twitchMatch[1];
                 const videoId = twitchMatch[2];
@@ -402,9 +404,9 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
                 videoName = "Twitch Audio";
               }
             }
-          } else if (ytUrl.includes('twitter.com/') || ytUrl.includes('x.com/')) {
+          } else if (urlInput.includes('twitter.com/') || urlInput.includes('x.com/')) {
             // Extract Twitter/X post information
-            const twitterMatch = ytUrl.match(/(?:twitter\.com|x\.com)\/([^\/]+)\/status\/(\d+)/);
+            const twitterMatch = urlInput.match(/(?:twitter\.com|x\.com)\/([^\/]+)\/status\/(\d+)/);
             if (twitterMatch) {
               const username = twitterMatch[1];
               const tweetId = twitterMatch[2];
@@ -412,9 +414,9 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
             } else {
               videoName = "Twitter Post";
             }
-          } else if (ytUrl.includes('kick.com/')) {
+          } else if (urlInput.includes('kick.com/')) {
             // Extract Kick streamer information
-            const kickMatch = ytUrl.match(/kick\.com\/([^\/\?]+)/);
+            const kickMatch = urlInput.match(/kick\.com\/([^\/\?]+)/);
             if (kickMatch) {
               const streamer = kickMatch[1];
               videoName = `Kick Stream (${streamer})`;
@@ -425,22 +427,22 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
         }
       } catch (titleError) {
         // Same fallback logic as above
-        if (ytUrl.includes('youtube.com/') || ytUrl.includes('youtu.be/')) {
-          const videoId = ytUrl.includes('v=') ? ytUrl.split('v=')[1]?.split('&')[0] : 
-                         ytUrl.includes('youtu.be/') ? ytUrl.split('youtu.be/')[1]?.split('?')[0] : '';
+        if (urlInput.includes('youtube.com/') || urlInput.includes('youtu.be/')) {
+          const videoId = urlInput.includes('v=') ? urlInput.split('v=')[1]?.split('&')[0] : 
+                         urlInput.includes('youtu.be/') ? urlInput.split('youtu.be/')[1]?.split('?')[0] : '';
           videoName = videoId ? `YouTube Audio (${videoId})` : "YouTube Audio";
-        } else if (ytUrl.includes('tiktok.com/')) {
-          const tiktokMatch = ytUrl.match(/tiktok\.com\/@[^\/]+\/video\/(\d+)/);
+        } else if (urlInput.includes('tiktok.com/')) {
+          const tiktokMatch = urlInput.match(/tiktok\.com\/@[^\/]+\/video\/(\d+)/);
           if (tiktokMatch) {
             videoName = `TikTok Audio (${tiktokMatch[1]})`;
           } else {
             videoName = "TikTok Audio";
           }
-        } else if (ytUrl.includes('twitch.tv/')) {
+        } else if (urlInput.includes('twitch.tv/')) {
           // Extract Twitch streamer name, video ID, or clip ID
-          if (ytUrl.includes('/clip/')) {
+          if (urlInput.includes('/clip/')) {
             // Handle Twitch clips
-            const clipMatch = ytUrl.match(/twitch\.tv\/([^\/]+)\/clip\/([^\/\?]+)/);
+            const clipMatch = urlInput.match(/twitch\.tv\/([^\/]+)\/clip\/([^\/\?]+)/);
             if (clipMatch) {
               const streamer = clipMatch[1];
               const clipId = clipMatch[2];
@@ -450,7 +452,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
             }
           } else {
             // Handle Twitch streams and VODs
-            const twitchMatch = ytUrl.match(/twitch\.tv\/([^\/]+)(?:\/v\/(\d+))?/);
+            const twitchMatch = urlInput.match(/twitch\.tv\/([^\/]+)(?:\/v\/(\d+))?/);
             if (twitchMatch) {
               const streamer = twitchMatch[1];
               const videoId = twitchMatch[2];
@@ -463,9 +465,9 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
               videoName = "Twitch Audio";
             }
           }
-        } else if (ytUrl.includes('twitter.com/') || ytUrl.includes('x.com/')) {
+        } else if (urlInput.includes('twitter.com/') || urlInput.includes('x.com/')) {
           // Extract Twitter/X post information
-          const twitterMatch = ytUrl.match(/(?:twitter\.com|x\.com)\/([^\/]+)\/status\/(\d+)/);
+          const twitterMatch = urlInput.match(/(?:twitter\.com|x\.com)\/([^\/]+)\/status\/(\d+)/);
           if (twitterMatch) {
             const username = twitterMatch[1];
             const tweetId = twitterMatch[2];
@@ -473,9 +475,9 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
           } else {
             videoName = "Twitter Post";
           }
-        } else if (ytUrl.includes('kick.com/')) {
+        } else if (urlInput.includes('kick.com/')) {
           // Extract Kick streamer information
-          const kickMatch = ytUrl.match(/kick\.com\/([^\/\?]+)/);
+          const kickMatch = urlInput.match(/kick\.com\/([^\/\?]+)/);
           if (kickMatch) {
             const streamer = kickMatch[1];
             videoName = `Kick Stream (${streamer})`;
@@ -867,7 +869,8 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
                 if (e.key === 'Enter') {
                   e.preventDefault();
                   if (!ytUrl || isVideoUploading || lockVideoPlatformButton) return;
-                  handleYoutubeDownload();
+                  try { e.currentTarget.blur(); } catch (_) {}
+                  handleYoutubeDownload(e.currentTarget.value);
                 }
               }}
               className="w-full p-4 rounded-xl text-white placeholder-gray-500 transition-all duration-300 focus:outline-none focus:ring-2"
