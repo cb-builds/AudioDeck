@@ -17,6 +17,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
   const [popupTitle, setPopupTitle] = useState("");
   const [popupMessage, setPopupMessage] = useState("");
   const [isExpiredPopup, setIsExpiredPopup] = useState(false);
+  const [isPreparingShare, setIsPreparingShare] = useState(false);
   const [newName, setNewName] = useState("");
   const [isReady, setIsReady] = useState(false);
   const [startTime, setStartTime] = useState("0.00");
@@ -1078,14 +1079,20 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
       const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent || "");
       if (isMobile) {
         try {
+          setIsPreparingShare(true);
           const shareFileName = `${(newName || 'trimmed').replace(/[^\w\-\.]+/g, '_')}.mp3`;
           const file = new File([blob], shareFileName, { type: 'audio/mpeg', lastModified: Date.now() });
           if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            // Stop showing the loader right before opening the share prompt
+            setIsPreparingShare(false);
             await navigator.share({ title: 'AudioDeck Clip', files: [file] });
             setStatus('Shared successfully');
             return;
           }
-        } catch (_) {}
+        } catch (_) {
+          // Ensure the loader is cleared on any error
+          setIsPreparingShare(false);
+        }
       }
 
       // Default: trigger download
@@ -1101,6 +1108,8 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
     } catch (err) {
       console.error("Download error:", err);
       setStatus(`Download failed: ${err.message}`);
+    } finally {
+      setIsPreparingShare(false);
     }
   };
 
@@ -1283,13 +1292,19 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
             
             <button
               onClick={handleDownload}
-              className="px-6 py-3 rounded-xl font-semibold text-white transition-all duration-300 transform hover:scale-105"
+              className={`px-6 py-3 rounded-xl font-semibold text-white transition-all duration-300 transform ${isPreparingShare ? 'opacity-60 cursor-wait' : 'hover:scale-105'}`}
               style={{
                 background: 'linear-gradient(135deg, #A44EFF, #427BFF)',
                 boxShadow: '0 4px 15px rgba(164, 78, 255, 0.3)'
               }}
+              disabled={isPreparingShare}
             >
-              Download
+              <span className="inline-flex items-center">
+                {isPreparingShare && (
+                  <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
+                )}
+                Download
+              </span>
             </button>
 
             {/* Share button removed; Download will invoke Web Share on mobile */}
@@ -1324,13 +1339,19 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
           
           <button
             onClick={handleDownload}
-            className="px-6 py-3 rounded-xl font-semibold text-white transition-all duration-300 transform hover:scale-105"
+            className={`px-6 py-3 rounded-xl font-semibold text-white transition-all duration-300 transform ${isPreparingShare ? 'opacity-60 cursor-wait' : 'hover:scale-105'}`}
             style={{
               background: 'linear-gradient(135deg, #A44EFF, #427BFF)',
               boxShadow: '0 4px 15px rgba(164, 78, 255, 0.3)'
             }}
+            disabled={isPreparingShare}
           >
-            Download
+            <span className="inline-flex items-center">
+              {isPreparingShare && (
+                <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
+              )}
+              Download
+            </span>
           </button>
 
           {/* Share button removed; Download will invoke Web Share on mobile */}
