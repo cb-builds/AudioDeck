@@ -13,6 +13,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
   const audioRef = useRef(null);
 
   const [status, setStatus] = useState("");
+  const [isStatusVisible, setIsStatusVisible] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
   const [popupTitle, setPopupTitle] = useState("");
   const [popupMessage, setPopupMessage] = useState("");
@@ -1500,21 +1501,36 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
         </div>
       </div>
       
-      {/* Status Message */}
+      {/* Status Message with toggle */}
       {status && (
-        <div 
-          className="p-4 rounded-xl text-center"
-          style={{
-            background: 'rgba(167, 139, 250, 0.1)',
-            border: '1px solid rgba(167, 139, 250, 0.3)'
-          }}
-        >
-          <div className="flex items-center justify-center">
-            {!isWaveformReady && (status.includes("Processing audio waveform") || status.includes("Initializing audio waveform")) && (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-            )}
-            <p className="text-white font-medium">{status}</p>
-          </div>
+        <div className="flex items-start gap-3">
+          <button
+            type="button"
+            onClick={() => setIsStatusVisible((v) => !v)}
+            className="flex items-center justify-center text-white font-bold opacity-50 hover:opacity-70 focus:opacity-70 transition-opacity cursor-pointer leading-none"
+            title={isStatusVisible ? "Hide status" : "Show status"}
+            aria-label={isStatusVisible ? "Hide status" : "Show status"}
+            style={{ background: 'transparent' }}
+          >
+            <span className="text-lg leading-none">{isStatusVisible ? '▾' : '▸'}</span>
+          </button>
+
+          {isStatusVisible && (
+            <div 
+              className="p-4 rounded-xl text-center flex-1"
+              style={{
+                background: 'rgba(167, 139, 250, 0.1)',
+                border: '1px solid rgba(167, 139, 250, 0.3)'
+              }}
+            >
+              <div className="flex items-center justify-center">
+                {!isWaveformReady && (status.includes('Processing audio waveform') || status.includes('Initializing audio waveform')) && (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                )}
+                <p className="text-white font-medium">{status}</p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
