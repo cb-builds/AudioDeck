@@ -1094,6 +1094,69 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
     }
   };
 
+  const handleShare = async () => {
+    if (!regionRef.current) {
+      setStatus("No region selected for sharing.");
+      return;
+    }
+    try {
+      const { start, end } = regionRef.current;
+      setStatus("Preparing share link...");
+
+      const requestBody = {
+        filename: clip,
+        startTime: start.toFixed(6),
+        endTime: end.toFixed(6),
+        newName: newName || 'shared'
+      };
+
+      // 1) Trim to the selected region on the server
+      const res = await fetch("/api/trim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Share preparation failed');
+      }
+      const data = await res.json();
+
+      // 2) Fetch the trimmed file as a Blob
+      const fileRes = await fetch(`/clips/${data.filename}`);
+      if (!fileRes.ok) throw new Error('Failed to fetch trimmed file');
+      const blob = await fileRes.blob();
+
+      // 3) Use Web Share API Level 2 to share the file itself
+      const fileName = `${(newName || 'shared').replace(/[^\w\-\.]+/g, '_')}.mp3`;
+      const file = new File([blob], fileName, { type: 'audio/mpeg', lastModified: Date.now() });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: 'AudioDeck Clip',
+          text: 'Check out this audio clip I made!',
+          files: [file],
+        });
+        setStatus('Shared successfully');
+        return;
+      }
+
+      // Fallback to sharing a link if files are not supported
+      const shareUrl = `${window.location.origin}/clips/${data.filename}`;
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: 'AudioDeck Clip', url: shareUrl });
+          setStatus('Shared link successfully');
+          return;
+        } catch (_) {}
+      }
+      await navigator.clipboard?.writeText?.(shareUrl);
+      setStatus('Sharing not supported. Link copied to clipboard');
+    } catch (err) {
+      setStatus(`Share failed: ${err.message}`);
+    }
+  };
+
   const handleReset = () => {
     if (!regionRef.current) {
       setStatus("No region selected to reset.");
@@ -1218,6 +1281,20 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
             >
               Download
             </button>
+
+            <button
+              onClick={handleShare}
+              aria-label="Share"
+              title="Share"
+              className="px-4 py-3 rounded-xl font-semibold text-white transition-all duration-300 transform hover:scale-105"
+              style={{
+                background: 'linear-gradient(135deg, #A44EFF, #427BFF)',
+                boxShadow: '0 4px 15px rgba(164, 78, 255, 0.3)'
+              }}
+              disabled={!isReady || !regionRef.current}
+            >
+              ⋮
+            </button>
           </div>
         </div>
 
@@ -1256,6 +1333,20 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
             }}
           >
             Download
+          </button>
+
+          <button
+            onClick={handleShare}
+            aria-label="Share"
+            title="Share"
+            className="px-4 py-3 rounded-xl font-semibold text-white transition-all duration-300 transform hover:scale-105"
+            style={{
+              background: 'linear-gradient(135deg, #A44EFF, #427BFF)',
+              boxShadow: '0 4px 15px rgba(164, 78, 255, 0.3)'
+            }}
+            disabled={!isReady || !regionRef.current}
+          >
+            ⋮
           </button>
         </div>
       </div>
