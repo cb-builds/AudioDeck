@@ -863,6 +863,13 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
               }
               value={ytUrl}
               onChange={(e) => setYtUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (!ytUrl || isVideoUploading || lockVideoPlatformButton) return;
+                  handleYoutubeDownload();
+                }
+              }}
               className="w-full p-4 rounded-xl text-white placeholder-gray-500 transition-all duration-300 focus:outline-none focus:ring-2"
               style={{
                 background: '#1E203A',
