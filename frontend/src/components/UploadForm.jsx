@@ -293,7 +293,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
   };
 
   const handleYoutubeDownload = async (initialUrl) => {
-    const urlInput = (initialUrl ?? ytUrl) || "";
+    const urlInput = ((initialUrl ?? ytUrl) || "").replace(/\s+/g, '');
     if (!urlInput) return setStatus("Please enter an audio/video URL.");
     setIsVideoUploading(true);
     if (typeof onExternalUploadStarted === 'function') {
@@ -864,12 +864,12 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
                   : "Video URL (YouTube, TikTok, Twitch, etc...)"
               }
               value={ytUrl}
-              onChange={(e) => setYtUrl(e.target.value)}
+              onChange={(e) => setYtUrl(e.target.value.replace(/\s+/g, ''))}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
                   if (!ytUrl || isVideoUploading || lockVideoPlatformButton) return;
-                  const current = e.currentTarget.value;
+              const current = e.currentTarget.value.replace(/\s+/g, '');
                   try { e.currentTarget.blur(); } catch (_) {}
                   setYtUrl("");
                   handleYoutubeDownload(current);
@@ -888,7 +888,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
           <button
             onClick={() => {
               if (!ytUrl || isVideoUploading || lockVideoPlatformButton) return;
-              const current = ytUrl;
+              const current = (ytUrl || '').replace(/\s+/g, '');
               try { ytInputRef.current && ytInputRef.current.blur && ytInputRef.current.blur(); } catch (_) {}
               setYtUrl("");
               handleYoutubeDownload(current);
