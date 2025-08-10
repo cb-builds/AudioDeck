@@ -4,6 +4,7 @@ const path = require("path");
 const { exec } = require("child_process");
 const fs = require("fs");
 const { broadcastProgress } = require('../wsHub');
+const { writeExpiryMeta } = require('../utils/expiry');
 
 // Track active downloads and their progress
 const activeDownloads = new Map();
@@ -533,6 +534,8 @@ router.post("/", (req, res) => {
               // Note: Can't send error response since we already sent the initial response
               console.error("File too large: File exceeds 25MB limit");
             } else {
+              // Write expiry metadata for the finalized clip
+              try { writeExpiryMeta(filePath, { originalFilename: path.basename(filePath) }); } catch (_) {}
               // Update download status to complete
               if (dl) {
                 dl.status = 'complete';

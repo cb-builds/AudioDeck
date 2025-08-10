@@ -96,13 +96,11 @@ function cleanupOldClips() {
 
 // Run cleanup every 30 minutes
 function startCleanupScheduler() {
-  console.log('Starting automatic cleanup scheduler (runs every 30 minutes)');
-  
+  console.log('Starting automatic cleanup scheduler (runs every 1 minute)');
   // Run initial cleanup
   cleanupOldClips();
-  
-  // Schedule cleanup every 30 minutes
-  setInterval(cleanupOldClips, 30 * 60 * 1000);
+  // Schedule cleanup every minute for near-real-time expiry handling
+  setInterval(cleanupOldClips, 60 * 1000);
 }
 
 module.exports = {

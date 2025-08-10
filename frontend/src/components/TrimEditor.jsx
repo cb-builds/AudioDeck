@@ -2,15 +2,21 @@ import React, { useEffect, useRef, useState } from "react";
 import WaveSurfer from "wavesurfer.js";
 import RegionsPlugin from "wavesurfer.js/dist/plugins/regions";
 
-export default function TrimEditor({ clip, originalFileName, expectedDuration = 0, onWaveformReady }) {
+export default function TrimEditor({ clip, originalFileName, expectedDuration = 0, onWaveformReady, onClipExpired }) {
   const containerRef = useRef(null);
   const wavesurferRef = useRef(null);
   const regionsRef = useRef(null);
   const regionRef = useRef(null);
   const progressTimerRef = useRef(null);
+  const expiryWarningTimerRef = useRef(null);
+  const expiryTimerRef = useRef(null);
   const audioRef = useRef(null);
 
   const [status, setStatus] = useState("");
+  const [showPopup, setShowPopup] = useState(false);
+  const [popupTitle, setPopupTitle] = useState("");
+  const [popupMessage, setPopupMessage] = useState("");
+  const [isExpiredPopup, setIsExpiredPopup] = useState(false);
   const [newName, setNewName] = useState("");
   const [isReady, setIsReady] = useState(false);
   const [startTime, setStartTime] = useState("0.00");
@@ -43,6 +49,12 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
       } catch (_) {}
       if (progressTimerRef.current) {
         clearInterval(progressTimerRef.current);
+      }
+      if (expiryWarningTimerRef.current) {
+        clearTimeout(expiryWarningTimerRef.current);
+      }
+      if (expiryTimerRef.current) {
+        clearTimeout(expiryTimerRef.current);
       }
     };
   }, []);
@@ -233,6 +245,46 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
       setIsWaveformReady(true); // Mark waveform as ready
       setIsInitializing(false); // Reset initialization flag
       setDuration(actualDuration);
+
+      // Try to fetch expiry meta to schedule warnings
+      try {
+        fetch(`/clips/${clip}.meta.json`, { cache: 'no-store' })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((meta) => {
+            if (!meta || !meta.expiryAt) return;
+            const now = Date.now();
+            const msUntilExpiry = meta.expiryAt - now;
+            const msUntilWarn = msUntilExpiry - 5 * 60 * 1000;
+            if (expiryWarningTimerRef.current) clearTimeout(expiryWarningTimerRef.current);
+            if (expiryTimerRef.current) clearTimeout(expiryTimerRef.current);
+            if (msUntilWarn > 0) {
+              expiryWarningTimerRef.current = setTimeout(() => {
+                setPopupTitle('Clip Expiring Soon');
+                setPopupMessage('This clip will expire in approximately 5 minutes.');
+                setShowPopup(true);
+                setIsExpiredPopup(false);
+              }, msUntilWarn);
+            } else if (msUntilExpiry > 0) {
+              setPopupTitle('Clip Expiring Soon');
+              setPopupMessage('This clip will expire very soon.');
+              setShowPopup(true);
+              setIsExpiredPopup(false);
+            }
+            if (msUntilExpiry > 0) {
+              expiryTimerRef.current = setTimeout(() => {
+                try {
+                  wavesurferRef.current?.pause();
+                } catch (_) {}
+                setIsPlaying(false);
+                setPopupTitle('Clip Expired');
+                setPopupMessage('This clip has expired and is no longer available.');
+                setShowPopup(true);
+                setIsExpiredPopup(true);
+              }, msUntilExpiry);
+            }
+          })
+          .catch(() => {});
+      } catch (_) {}
       
       // Add a default region using 25% and 75% of duration
       try {
@@ -1353,6 +1405,44 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
             )}
             <p className="text-white font-medium">{status}</p>
+          </div>
+        </div>
+      )}
+
+      {showPopup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div 
+            className="max-w-md w-full mx-4 p-6 rounded-2xl"
+            style={{
+              background: '#14162B',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+              border: '1px solid rgba(167, 139, 250, 0.2)'
+            }}
+          >
+            <div className="text-center">
+              <div className="text-4xl mb-4">⚠️</div>
+              <h3 className="text-xl font-semibold text-white mb-3">
+                {popupTitle}
+              </h3>
+              <div className="text-gray-300 mb-6 whitespace-pre-line">
+                {popupMessage}
+              </div>
+              <button
+                onClick={() => {
+                  setShowPopup(false);
+                  if (isExpiredPopup && typeof onClipExpired === 'function') {
+                    onClipExpired();
+                  }
+                }}
+                className="w-full py-3 px-6 rounded-xl font-semibold text-white transition-all duration-300 transform hover:scale-105"
+                style={{
+                  background: 'linear-gradient(135deg, #A44EFF, #427BFF)',
+                  boxShadow: '0 4px 15px rgba(164, 78, 255, 0.3)'
+                }}
+              >
+                OK
+              </button>
+            </div>
           </div>
         </div>
       )}

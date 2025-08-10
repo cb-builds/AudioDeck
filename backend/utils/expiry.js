@@ -1,7 +1,8 @@
 const fs = require('fs');
 
-// Default TTL for clips (1 hour)
-const ONE_HOUR_MS = 60 * 60 * 1000;
+// Default TTL for clips: 60 minutes (override via env CLIP_TTL_MINUTES)
+const DEFAULT_TTL_MINUTES = parseInt(process.env.CLIP_TTL_MINUTES || '60', 10);
+const ONE_HOUR_MS = DEFAULT_TTL_MINUTES * 60 * 1000;
 
 function computeExpiry(createdAtMs, ttlMs = ONE_HOUR_MS) {
   return createdAtMs + ttlMs;

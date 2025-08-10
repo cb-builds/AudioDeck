@@ -207,6 +207,17 @@ function App() {
               originalFileName={originalFileName} 
               expectedDuration={videoDuration}
               onWaveformReady={handleWaveformReady}
+              onClipExpired={() => {
+                // Reset app state similar to Start Over
+                setUploadedFile(null);
+                setOriginalFileName("");
+                setVideoDuration(0);
+                setDownloadComplete(false);
+                setLockVideoPlatformButton(false);
+                setResetInputsKey((k) => k + 1);
+                // Scroll back to top to reveal upload boxes
+                try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) {}
+              }}
             />
             </>
           )}

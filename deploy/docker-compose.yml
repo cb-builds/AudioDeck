@@ -14,8 +14,8 @@ services:
       - PORT=4000
       - MAX_FILE_SIZE=26214400
       - MAX_DURATION=1200
-      - CLEANUP_INTERVAL=1800000
-      - FILE_EXPIRY=3600000
+      - CLEANUP_INTERVAL=60000 # currently unused; cleanup runs every 1m in code
+      - CLIP_TTL_MINUTES=60
       - MAX_STORAGE=524288000
     restart: unless-stopped
     healthcheck:
