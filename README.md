@@ -1,5 +1,5 @@
 <h1 style="display: flex; align-items: center; gap: 8px;">
-  <img src="frontend/public/AudioDeck%20Logo.png" alt="AudioDeck Logo" width="80" height="80" />
+  <img src="frontend/public/AudioDeck%20Logo%202.PNG" alt="AudioDeck Logo" width="80" height="80" />
   <span>AudioDeck</span>
 </h1>
 

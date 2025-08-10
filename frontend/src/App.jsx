@@ -127,11 +127,12 @@ function App() {
         <div className="text-center mb-12">
           <div className="flex items-center justify-center mb-4">
             <img 
-              src="/AudioDeck Logo.png" 
+              src="/AudioDeck Logo 2.PNG" 
               alt="AudioDeck Logo" 
-              className="w-20 h-20"
+              className="w-[3.75rem] h-[3.75rem]"
               style={{
-                filter: 'drop-shadow(0 8px 16px rgba(0, 0, 0, 0.7))'
+                filter: 'drop-shadow(0 8px 16px rgba(0, 0, 0, 0.7))',
+                marginRight: '-1px'
               }}
             />
             <h1 
@@ -143,7 +144,7 @@ function App() {
                 backgroundClip: 'text',
                 fontFamily: 'Russo One, sans-serif',
                 filter: 'drop-shadow(0 8px 16px rgba(0, 0, 0, 0.7))',
-                marginLeft: '-16px'
+                marginLeft: '0'
               }}
             >
               AudioDeck
@@ -164,15 +165,29 @@ function App() {
           )}
           
           {uploadedFile && downloadComplete && (
+            <>
+              {isNarrowMobile && (
+                <div className="flex justify-end -mb-2 pr-4">
+                  <button
+                    onClick={handleStartOver}
+                    className="px-4 py-2 rounded-lg font-semibold text-white transition-all duration-300 transform hover:scale-105"
+                    style={{
+                      background: 'linear-gradient(135deg, #A44EFF, #427BFF)',
+                      boxShadow: '0 4px 15px rgba(164, 78, 255, 0.3)'
+                    }}
+                  >
+                    Start Over
+                  </button>
+                </div>
+              )}
             <TrimEditor 
               key={uploadedFile}
               clip={uploadedFile} 
               originalFileName={originalFileName} 
               expectedDuration={videoDuration}
               onWaveformReady={handleWaveformReady}
-              showStartOver={isNarrowMobile}
-              onStartOver={handleStartOver}
             />
+            </>
           )}
         </div>
       </div>
