@@ -7,6 +7,7 @@ function App() {
   const [originalFileName, setOriginalFileName] = useState("");
   const [videoDuration, setVideoDuration] = useState(0);
   const [downloadComplete, setDownloadComplete] = useState(false);
+  const [lockVideoPlatformButton, setLockVideoPlatformButton] = useState(false);
 
   // Initialize Ko-fi widget
   useEffect(() => {
@@ -65,6 +66,23 @@ function App() {
 
   const handleDownloadComplete = () => {
     setDownloadComplete(true);
+    // Light the button back up as soon as Trim section appears
+    setLockVideoPlatformButton(false);
+  };
+
+  const handleExternalUploadStarted = () => {
+    // Lock the video platform button until Trim section appears
+    setLockVideoPlatformButton(true);
+    // Hide Trim section and reset any existing waveform/clip state
+    setDownloadComplete(false);
+    setUploadedFile(null);
+    setOriginalFileName("");
+    setVideoDuration(0);
+  };
+
+  const handleWaveformReady = () => {
+    // Still fine to unlock here as well; App will already unlock on download complete
+    setLockVideoPlatformButton(false);
   };
 
   return (
@@ -106,10 +124,21 @@ function App() {
 
         {/* Main Content */}
         <div className="space-y-8">
-          <UploadForm onFileUploaded={handleFileUploaded} onDownloadComplete={handleDownloadComplete} />
+          <UploadForm 
+            onFileUploaded={handleFileUploaded} 
+            onDownloadComplete={handleDownloadComplete}
+            onExternalUploadStarted={handleExternalUploadStarted}
+            lockVideoPlatformButton={lockVideoPlatformButton}
+          />
           
           {uploadedFile && downloadComplete && (
-            <TrimEditor clip={uploadedFile} originalFileName={originalFileName} expectedDuration={videoDuration} />
+            <TrimEditor 
+              key={uploadedFile}
+              clip={uploadedFile} 
+              originalFileName={originalFileName} 
+              expectedDuration={videoDuration}
+              onWaveformReady={handleWaveformReady}
+            />
           )}
         </div>
       </div>

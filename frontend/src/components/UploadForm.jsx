@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
 import { truncateText } from "../utils/textUtils";
 
-const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
+const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarted, lockVideoPlatformButton }) => {
   const [file, setFile] = useState(null);
   const [ytUrl, setYtUrl] = useState("");
   const [status, setStatus] = useState("");
@@ -170,6 +170,9 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
   const handleFileUpload = async (fileToUpload = file) => {
     if (!fileToUpload) return setStatus("No file selected.");
     
+    if (typeof onExternalUploadStarted === 'function') {
+      onExternalUploadStarted();
+    }
     startProgress("Uploading file...");
     
     const formData = new FormData();
@@ -233,6 +236,9 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
   const handleYoutubeDownload = async () => {
     if (!ytUrl) return setStatus("Please enter an audio/video URL.");
     setIsVideoUploading(true);
+    if (typeof onExternalUploadStarted === 'function') {
+      onExternalUploadStarted();
+    }
     setIsDownloadStarted(false); // Reset download started flag
     startProgress("Gathering Audio Metadata...");
     setStatus("Gathering Audio Metadata...");
@@ -404,16 +410,16 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
           } else {
             videoName = "Twitter Post";
           }
-                 } else if (ytUrl.includes('kick.com/')) {
-           // Extract Kick streamer information
-           const kickMatch = ytUrl.match(/kick\.com\/([^\/\?]+)/);
-           if (kickMatch) {
-             const streamer = kickMatch[1];
-             videoName = `Kick Stream (${streamer})`;
-           } else {
-             videoName = "Kick Stream";
-           }
+        } else if (ytUrl.includes('kick.com/')) {
+          // Extract Kick streamer information
+          const kickMatch = ytUrl.match(/kick\.com\/([^\/\?]+)/);
+          if (kickMatch) {
+            const streamer = kickMatch[1];
+            videoName = `Kick Stream (${streamer})`;
+          } else {
+            videoName = "Kick Stream";
           }
+        }
       }
       
       // Progress: 20% after title extraction
@@ -502,8 +508,9 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
       } else {
         setStatus(`Video upload failed: ${err.message}`);
       }
-    } finally {
       setIsVideoUploading(false);
+    } finally {
+      // Do not clear isVideoUploading here; it will be cleared on SSE/WS completion
     }
   };
 
@@ -572,6 +579,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
                 hideProgress();
                 try { es.close(); } catch (_) {}
                 setActiveSSEConnections(prev => { const s=new Set(prev); s.delete(downloadId); return s; });
+                setIsVideoUploading(false);
               }, 2000);
             }
           }
@@ -665,6 +673,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
               hideProgress();
               try { ws.close(); } catch (_) {}
               setActiveSSEConnections(prev => { const s=new Set(prev); s.delete(downloadId); return s; });
+              setIsVideoUploading(false);
             }, 2000);
           }
         }
@@ -799,7 +808,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
           
           <button
             onClick={handleYoutubeDownload}
-            disabled={!ytUrl || isVideoUploading}
+            disabled={!ytUrl || isVideoUploading || lockVideoPlatformButton}
             className="w-full py-3 px-6 rounded-xl font-semibold text-white transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               background: 'linear-gradient(135deg, #36D1DC, #5B86E5)',
@@ -811,7 +820,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete }) => {
                 Downloading...
               </div>
             ) : (
-              "Download Audio from Platform"
+              "Upload from Video Platform"
             )}
           </button>
         </div>
