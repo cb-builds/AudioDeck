@@ -321,7 +321,7 @@ router.get("/title", async (req, res) => {
       }
 
       // Truncate title if it's too long
-      const truncatedTitle = title.length > 50 ? title.substring(0, 47) + '...' : title;
+      const truncatedTitle = title.length > 100 ? title.substring(0, 97) + '...' : title;
 
       res.json({ title: truncatedTitle });
     });

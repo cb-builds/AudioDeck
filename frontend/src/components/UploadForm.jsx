@@ -499,7 +499,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
       }
       
       // Truncate video name for display
-      const truncatedVideoName = truncateText(videoName, 50);
+      const truncatedVideoName = truncateText(videoName, 100);
       
       // Construct filename from downloadId
       const filename = `${data.downloadId}_imported_video.mp3`;
@@ -581,8 +581,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
             if ((progress >= 100 || status === 'complete') && !completionHandled && !errorHandled) {
               completionHandled = true;
               const filename = `${downloadId}_imported_video.mp3`;
-              const truncatedVideoName = truncateText(videoName, 50);
-              if (onFileUploaded) onFileUploaded(filename, truncatedVideoName, data.videoDuration);
+              if (onFileUploaded) onFileUploaded(filename, videoName, data.videoDuration);
               setTimeout(() => {
                 hideProgress();
                 try { es.close(); } catch (_) {}
@@ -674,9 +673,8 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
           }
           if ((progress >= 100 || status === 'complete') && !completionHandled && !errorHandled) {
             completionHandled = true;
-            const filename = `${downloadId}_imported_video.mp3`;
-            const truncatedVideoName = truncateText(videoName, 50);
-            if (onFileUploaded) onFileUploaded(filename, truncatedVideoName, data.videoDuration);
+                          const filename = `${downloadId}_imported_video.mp3`;
+              if (onFileUploaded) onFileUploaded(filename, videoName, data.videoDuration);
             setTimeout(() => {
               hideProgress();
               try { ws.close(); } catch (_) {}

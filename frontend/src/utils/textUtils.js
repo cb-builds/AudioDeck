@@ -1,5 +1,5 @@
 // Text utility functions
-export const truncateText = (text, maxLength = 50) => {
+export const truncateText = (text, maxLength = 100) => {
   if (!text) return '';
   return text.length > maxLength ? text.substring(0, maxLength - 3) + '...' : text;
 };

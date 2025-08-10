@@ -1054,28 +1054,95 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
       }}
     >
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6">
-        <div className="flex items-center flex-1 min-w-0">
-          <div 
-            className="w-12 h-12 rounded-full flex items-center justify-center mr-4"
-            style={{
-              background: 'linear-gradient(135deg, #A44EFF, #427BFF)'
-            }}
-          >
-            <span className="text-white text-xl">✂️</span>
+      <div className="mb-6">
+        {/* Small layout: icon + label on its own line, then filename, then description */}
+        <div className="flex flex-col lg:hidden">
+          <div className="flex items-center mb-2">
+            <div 
+              className="w-12 h-12 rounded-full flex items-center justify-center mr-4"
+              style={{
+                background: 'linear-gradient(135deg, #A44EFF, #427BFF)'
+              }}
+            >
+              <span className="text-white text-xl">✂️</span>
+            </div>
+            <h2 className="text-2xl font-bold text-white">Trim Audio:</h2>
           </div>
-          <div className="min-w-0">
-            <h2 className="text-2xl font-bold text-white truncate" title={originalFileName || clip}>
-              Trim Audio: {originalFileName || clip}
-            </h2>
-            <p className="text-gray-400 text-sm">
-              Drag to move selection, resize edges, or use timestamp inputs below
-            </p>
+          <div className="min-w-0 mb-1">
+            <span className="block text-2xl font-semibold text-white truncate" title={originalFileName || clip}>
+              {originalFileName || clip}
+            </span>
+          </div>
+          <p className="text-gray-400 text-sm">
+            Drag to move selection, resize edges, or use timestamp inputs below
+          </p>
+        </div>
+
+        {/* Large layout: icon + label + filename inline, with buttons on the right */}
+        <div className="hidden lg:flex items-center justify-between">
+          <div className="flex items-center flex-1 min-w-0">
+            <div 
+              className="w-12 h-12 rounded-full flex items-center justify-center mr-4"
+              style={{
+                background: 'linear-gradient(135deg, #A44EFF, #427BFF)'
+              }}
+            >
+              <span className="text-white text-xl">✂️</span>
+            </div>
+            <div className="min-w-0 w-full">
+              <div className="flex items-baseline gap-2 min-w-0">
+                <h2 className="text-2xl font-bold text-white shrink-0">Trim Audio:</h2>
+                <span className="text-2xl font-bold text-white truncate" title={originalFileName || clip}>
+                  {originalFileName || clip}
+                </span>
+              </div>
+              <p className="text-gray-400 text-sm mt-1">
+                Drag to move selection, resize edges, or use timestamp inputs below
+              </p>
+            </div>
+          </div>
+          
+          {/* Buttons on large screens */}
+          <div className="flex gap-3 w-auto justify-end ml-4">
+            <button
+              onClick={handleReset}
+              className="px-6 py-3 rounded-xl font-bold text-white transition-all duration-300 transform hover:scale-105"
+              style={{
+                background: 'linear-gradient(135deg, #A44EFF, #427BFF)',
+                boxShadow: '0 4px 15px rgba(164, 78, 255, 0.3)'
+              }}
+              disabled={!isReady || !regionRef.current}
+            >
+              ↻
+            </button>
+            
+            <button
+              onClick={togglePlayback}
+              className="px-6 py-3 rounded-xl font-bold text-white transition-all duration-300 transform hover:scale-105"
+              style={{
+                background: 'linear-gradient(135deg, #36D1DC, #5B86E5)',
+                boxShadow: '0 4px 15px rgba(54, 209, 220, 0.3)'
+              }}
+              disabled={!isReady || !regionRef.current}
+            >
+              {isPlaying ? "⏸" : "▶"}
+            </button>
+            
+            <button
+              onClick={handleDownload}
+              className="px-6 py-3 rounded-xl font-semibold text-white transition-all duration-300 transform hover:scale-105"
+              style={{
+                background: 'linear-gradient(135deg, #A44EFF, #427BFF)',
+                boxShadow: '0 4px 15px rgba(164, 78, 255, 0.3)'
+              }}
+            >
+              Download
+            </button>
           </div>
         </div>
-        
-        {/* Play Button in Header */}
-        <div className="flex gap-3 mt-4 lg:mt-0 w-full lg:w-auto justify-center lg:justify-end">
+
+        {/* Buttons for small screens only */}
+        <div className="flex gap-3 mt-4 w-full justify-center lg:hidden">
           <button
             onClick={handleReset}
             className="px-6 py-3 rounded-xl font-bold text-white transition-all duration-300 transform hover:scale-105"
@@ -1125,7 +1192,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
       </div>
       
       {/* Controls Section */}
-      <div className="flex gap-4">
+      <div className="flex flex-col lg:flex-row gap-4">
         {/* Timestamp Controls - Left Side */}
         <div 
           className="flex-1 p-4 rounded-xl"
@@ -1134,45 +1201,51 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
             border: '1px solid rgba(167, 139, 250, 0.2)'
           }}
         >
-          <div className="flex flex-row flex-nowrap gap-4 items-center justify-center lg:justify-start">
-            <div className="flex flex-col items-center lg:flex-row lg:items-center gap-1 lg:gap-3 text-center lg:text-left">
-              <label className="text-sm text-gray-300 font-medium">Start Time (s):</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={startTime}
-                onChange={(e) => {
-                  const newStartTime = e.target.value;
-                  setStartTime(newStartTime);
-                  updateRegionInRealTime(newStartTime, endTime);
-                }}
-                className="w-28 lg:w-24 p-2 rounded-lg text-white font-mono"
-                style={{
-                  background: '#1E203A',
-                  border: '1px solid rgba(167, 139, 250, 0.3)'
-                }}
-              />
+          <div className="flex flex-row flex-nowrap gap-4 items-center justify-center lg:justify-start w-full">
+            <div className="flex flex-col items-center lg:flex-row lg:items-center gap-1 lg:gap-3 text-center lg:text-left flex-1 min-w-0">
+              <label className="text-sm text-gray-300 font-medium">Start Time</label>
+              <div className="relative w-full" style={{ maxWidth: '6.4rem' }}>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  pattern="[0-9]*[.,]?[0-9]*"
+                  value={startTime}
+                  onChange={(e) => {
+                    const newStartTime = e.target.value;
+                    setStartTime(newStartTime);
+                    updateRegionInRealTime(newStartTime, endTime);
+                  }}
+                  className="w-full box-border p-2 pl-3 pr-[2.2em] rounded-lg text-white font-mono text-sm leading-tight"
+                  style={{
+                    background: '#1E203A',
+                    border: '1px solid rgba(167, 139, 250, 0.3)'
+                  }}
+                />
+                <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-xs text-gray-400 px-0.5">(s)</span>
+              </div>
             </div>
             
-            <div className="flex flex-col items-center lg:flex-row lg:items-center gap-1 lg:gap-3 text-center lg:text-left">
-              <label className="text-sm text-gray-300 font-medium">End Time (s):</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={endTime}
-                onChange={(e) => {
-                  const newEndTime = e.target.value;
-                  setEndTime(newEndTime);
-                  updateRegionInRealTime(startTime, newEndTime);
-                }}
-                className="w-28 lg:w-24 p-2 rounded-lg text-white font-mono"
-                style={{
-                  background: '#1E203A',
-                  border: '1px solid rgba(167, 139, 250, 0.3)'
-                }}
-              />
+            <div className="flex flex-col items-center lg:flex-row lg:items-center gap-1 lg:gap-3 text-center lg:text-left flex-1 min-w-0">
+              <label className="text-sm text-gray-300 font-medium">End Time</label>
+              <div className="relative w-full" style={{ maxWidth: '6.4rem' }}>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  pattern="[0-9]*[.,]?[0-9]*"
+                  value={endTime}
+                  onChange={(e) => {
+                    const newEndTime = e.target.value;
+                    setEndTime(newEndTime);
+                    updateRegionInRealTime(startTime, newEndTime);
+                  }}
+                  className="w-full box-border p-2 pl-3 pr-[2.2em] rounded-lg text-white font-mono text-sm leading-tight"
+                  style={{
+                    background: '#1E203A',
+                    border: '1px solid rgba(167, 139, 250, 0.3)'
+                  }}
+                />
+                <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-xs text-gray-400 px-0.5">(s)</span>
+              </div>
             </div>
           </div>
         </div>
@@ -1185,32 +1258,38 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
             border: '1px solid rgba(167, 139, 250, 0.2)'
           }}
         >
-          <div className="flex gap-4 items-center">
-            <button
-              onClick={zoomOut}
-              className="px-4 py-2 rounded-xl font-semibold text-white transition-all duration-300 transform hover:scale-105"
-              style={{
-                background: 'linear-gradient(135deg, #A44EFF, #427BFF)',
-                boxShadow: '0 4px 15px rgba(164, 78, 255, 0.3)'
-              }}
-              disabled={!isReady || !regionRef.current}
-            >
-              🔍−
-            </button>
-            
-            <button
-              onClick={zoomIn}
-              className="px-4 py-2 rounded-xl font-semibold text-white transition-all duration-300 transform hover:scale-105"
-              style={{
-                background: 'linear-gradient(135deg, #A44EFF, #427BFF)',
-                boxShadow: '0 4px 15px rgba(164, 78, 255, 0.3)'
-              }}
-              disabled={!isReady}
-            >
-              🔍+
-            </button>
-            
-            <div className="flex-1 mx-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-center justify-center lg:justify-start w-full">
+            {/* Buttons and zoom value stay together; value between buttons on <sm */}
+            <div className="flex gap-4 items-center">
+              <button
+                onClick={zoomOut}
+                className="px-4 py-2 rounded-xl font-semibold text-white transition-all duration-300 transform hover:scale-105 order-1"
+                style={{
+                  background: 'linear-gradient(135deg, #A44EFF, #427BFF)',
+                  boxShadow: '0 4px 15px rgba(164, 78, 255, 0.3)'
+                }}
+                disabled={!isReady || !regionRef.current}
+              >
+                🔍−
+              </button>
+              <span className="text-sm text-gray-300 min-w-[60px] font-medium text-center order-2 sm:order-3">
+                {zoomLevel.toFixed(1)}x
+              </span>
+              <button
+                onClick={zoomIn}
+                className="px-4 py-2 rounded-xl font-semibold text-white transition-all duration-300 transform hover:scale-105 order-3 sm:order-2"
+                style={{
+                  background: 'linear-gradient(135deg, #A44EFF, #427BFF)',
+                  boxShadow: '0 4px 15px rgba(164, 78, 255, 0.3)'
+                }}
+                disabled={!isReady}
+              >
+                🔍+
+              </button>
+            </div>
+
+            {/* Slider drops below buttons on very small screens */}
+            <div className="flex-1 w-full sm:w-auto mx-4">
               <input
                 type="range"
                 min="1.0"
@@ -1228,10 +1307,6 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
                 disabled={!isReady}
               />
             </div>
-            
-            <span className="text-sm text-gray-300 min-w-[60px] font-medium">
-              {zoomLevel.toFixed(1)}x
-            </span>
           </div>
         </div>
       </div>
