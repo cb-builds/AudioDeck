@@ -17,6 +17,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
   const [currentAudioName, setCurrentAudioName] = useState("");
   const [activeSSEConnections, setActiveSSEConnections] = useState(new Set());
   const [isDownloadStarted, setIsDownloadStarted] = useState(false);
+  const [isNarrowViewport, setIsNarrowViewport] = useState(false);
 
   const progressAnimRef = useRef(null);
   const targetProgressRef = useRef(0);
@@ -29,6 +30,20 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
     const fileEl = document.getElementById('file-upload');
     if (fileEl) fileEl.value = "";
   }, [resetInputsKey]);
+
+  // Track viewport width to adjust placeholder text responsively
+  useEffect(() => {
+    const updateViewportFlag = () => {
+      try {
+        if (typeof window !== 'undefined') {
+          setIsNarrowViewport(window.innerWidth < 1000);
+        }
+      } catch (_) {}
+    };
+    updateViewportFlag();
+    window.addEventListener('resize', updateViewportFlag);
+    return () => window.removeEventListener('resize', updateViewportFlag);
+  }, []);
 
   const PROGRESS_TICK_MS = 120; // tick for visible number-by-number
   const PROGRESS_STEP_PERCENT = 1.5; // ~3x faster than 0.5% per tick
@@ -731,7 +746,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
           >
             <span className="text-white text-lg">📁</span>
           </div>
-          <h2 className="text-xl font-semibold text-white">Upload Audio File</h2>
+          <h2 className="text-xl font-semibold text-white">Upload File</h2>
         </div>
         
         <div className="space-y-4 flex-1 flex flex-col">
@@ -752,10 +767,10 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
             >
               <div className="text-4xl mb-2">🎵</div>
               <div className="text-gray-300 mb-2 truncate max-w-xs text-center">
-                {file ? file.name : "Click to select audio file"}
+                {file ? file.name : "Click to select file"}
               </div>
               <div className="text-sm text-gray-500 text-center">
-                Supports MP3, WAV, M4A, and more
+                Supports MP3, WAV, MP4, and more
               </div>
             </label>
           </div>
@@ -801,7 +816,11 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
           <div className="flex-1 flex items-center">
             <input
               type="text"
-              placeholder="Video URL (YouTube, TikTok, Twitch, etc...)"
+              placeholder={
+                isNarrowViewport
+                  ? "Video URL (YouTube, TikTok, etc...)"
+                  : "Video URL (YouTube, TikTok, Twitch, etc...)"
+              }
               value={ytUrl}
               onChange={(e) => setYtUrl(e.target.value)}
               className="w-full p-4 rounded-xl text-white placeholder-gray-500 transition-all duration-300 focus:outline-none focus:ring-2"
