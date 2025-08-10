@@ -8,6 +8,7 @@ function App() {
   const [videoDuration, setVideoDuration] = useState(0);
   const [downloadComplete, setDownloadComplete] = useState(false);
   const [lockVideoPlatformButton, setLockVideoPlatformButton] = useState(false);
+  const [resetInputsKey, setResetInputsKey] = useState(0);
 
   // Initialize Ko-fi widget
   useEffect(() => {
@@ -68,6 +69,8 @@ function App() {
     setDownloadComplete(true);
     // Light the button back up as soon as Trim section appears
     setLockVideoPlatformButton(false);
+    // Tell UploadForm to clear its inputs when TrimEditor shows
+    setResetInputsKey((k) => k + 1);
   };
 
   const handleExternalUploadStarted = () => {
@@ -129,6 +132,7 @@ function App() {
             onDownloadComplete={handleDownloadComplete}
             onExternalUploadStarted={handleExternalUploadStarted}
             lockVideoPlatformButton={lockVideoPlatformButton}
+            resetInputsKey={resetInputsKey}
           />
           
           {uploadedFile && downloadComplete && (

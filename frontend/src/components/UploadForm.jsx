@@ -1,7 +1,7 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { truncateText } from "../utils/textUtils";
 
-const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarted, lockVideoPlatformButton }) => {
+const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarted, lockVideoPlatformButton, resetInputsKey }) => {
   const [file, setFile] = useState(null);
   const [ytUrl, setYtUrl] = useState("");
   const [status, setStatus] = useState("");
@@ -21,6 +21,14 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
   const progressAnimRef = useRef(null);
   const targetProgressRef = useRef(0);
   const currentProgressRef = useRef(0);
+
+  // Reset inputs when requested by parent (e.g., when TrimEditor appears)
+  useEffect(() => {
+    setFile(null);
+    setYtUrl("");
+    const fileEl = document.getElementById('file-upload');
+    if (fileEl) fileEl.value = "";
+  }, [resetInputsKey]);
 
   const PROGRESS_TICK_MS = 120; // tick for visible number-by-number
   const PROGRESS_STEP_PERCENT = 1.5; // ~3x faster than 0.5% per tick
@@ -787,7 +795,7 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
           >
             <span className="text-white text-lg">🎵</span>
           </div>
-          <h2 className="text-xl font-semibold text-white">Upload from Audio/Video Platform</h2>
+          <h2 className="text-xl font-semibold text-white">Upload from Video Platform</h2>
         </div>
         
         <div className="space-y-4 flex-1 flex flex-col">
