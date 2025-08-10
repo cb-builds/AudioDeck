@@ -1339,12 +1339,23 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
       
       {/* Waveform Container */}
       <div 
-        className="rounded-xl overflow-hidden"
+        className="rounded-xl overflow-hidden relative"
         style={{
           background: '#1A1C33',
           border: '1px solid rgba(167, 139, 250, 0.2)'
         }}
       >
+        {/* Loading overlay while waveform initializes */}
+        {(!isWaveformReady && (status.includes('Processing audio waveform') || status.includes('Initializing audio waveform'))) && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="flex items-center">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              <p className="text-white font-medium text-sm">
+                {status.includes('Processing audio waveform') ? 'Processing audio waveform…' : 'Initializing audio waveform…'}
+              </p>
+            </div>
+          </div>
+        )}
         <div ref={containerRef} className="w-full wavesurfer-container" />
       </div>
       
