@@ -763,8 +763,9 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
           </div>
           
           <button
-            onClick={handleReupload}
-            className="w-full py-3 px-6 rounded-xl font-semibold text-white transition-all duration-300 transform hover:scale-105"
+            onClick={triggerFileSelect}
+            disabled={lockVideoPlatformButton}
+            className="w-full py-3 px-6 rounded-xl font-semibold text-white transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               background: 'linear-gradient(135deg, #A44EFF, #427BFF)',
               boxShadow: '0 4px 15px rgba(164, 78, 255, 0.3)'
