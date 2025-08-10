@@ -869,8 +869,10 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
                 if (e.key === 'Enter') {
                   e.preventDefault();
                   if (!ytUrl || isVideoUploading || lockVideoPlatformButton) return;
+                  const current = e.currentTarget.value;
                   try { e.currentTarget.blur(); } catch (_) {}
-                  handleYoutubeDownload(e.currentTarget.value);
+                  setYtUrl("");
+                  handleYoutubeDownload(current);
                 }
               }}
               className="w-full p-4 rounded-xl text-white placeholder-gray-500 transition-all duration-300 focus:outline-none focus:ring-2"
@@ -879,11 +881,18 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
                 border: '1px solid rgba(167, 139, 250, 0.2)',
                 focusRing: '#A44EFF'
               }}
+              ref={ytInputRef}
             />
           </div>
           
           <button
-            onClick={handleYoutubeDownload}
+            onClick={() => {
+              if (!ytUrl || isVideoUploading || lockVideoPlatformButton) return;
+              const current = ytUrl;
+              try { ytInputRef.current && ytInputRef.current.blur && ytInputRef.current.blur(); } catch (_) {}
+              setYtUrl("");
+              handleYoutubeDownload(current);
+            }}
             disabled={!ytUrl || isVideoUploading || lockVideoPlatformButton}
             className="w-full py-3 px-6 rounded-xl font-semibold text-white transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
