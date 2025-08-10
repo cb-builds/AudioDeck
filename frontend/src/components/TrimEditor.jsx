@@ -449,6 +449,32 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
     });
   };
 
+  // Improve touch interactions on mobile: prevent page scroll from stealing region drags
+  useEffect(() => {
+    const containerEl = containerRef.current;
+    if (!containerEl) return;
+
+    const preventScrollOnRegion = (event) => {
+      try {
+        if (
+          event.cancelable &&
+          event.target &&
+          typeof event.target.closest === 'function' &&
+          event.target.closest('.wavesurfer-region')
+        ) {
+          event.preventDefault();
+        }
+      } catch (_) {
+        // no-op
+      }
+    };
+
+    containerEl.addEventListener('touchmove', preventScrollOnRegion, { passive: false });
+    return () => {
+      containerEl.removeEventListener('touchmove', preventScrollOnRegion);
+    };
+  }, [isReady]);
+
   // Check if region handles are visible and if drag should be disabled
   const shouldDisableDrag = () => {
     if (!regionRef.current || !wavesurferRef.current) return false;
@@ -1188,7 +1214,7 @@ export default function TrimEditor({ clip, originalFileName, expectedDuration = 
           border: '1px solid rgba(167, 139, 250, 0.2)'
         }}
       >
-        <div ref={containerRef} className="w-full" />
+        <div ref={containerRef} className="w-full wavesurfer-container" />
       </div>
       
       {/* Controls Section */}

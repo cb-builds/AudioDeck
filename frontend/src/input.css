@@ -24,3 +24,28 @@
   border: 2px solid white;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
+
+/* Mobile touch improvements for WaveSurfer regions */
+@media (pointer: coarse) {
+  /* Prevent browser touch gestures interfering with region drag */
+  .wavesurfer-container {
+    touch-action: none;
+  }
+
+  /* Enlarge region resize handle touch targets (keep visual edge aligned) */
+  .wavesurfer-container .wavesurfer-region [data-handle],
+  .wavesurfer-container .wavesurfer-region-handle,
+  .wavesurfer-container .wavesurfer-handle {
+    width: 24px;
+    margin-left: -12px;
+    touch-action: none;
+  }
+
+  /* Optionally increase the vertical touch area of the region itself without visual shift */
+  .wavesurfer-container .wavesurfer-region {
+    padding-top: 8px;
+    padding-bottom: 8px;
+    margin-top: -8px;
+    margin-bottom: -8px;
+  }
+}
