@@ -356,7 +356,7 @@ router.get("/title", async (req, res) => {
 });
 
 // POST /api/youtube
-router.post("/", (req, res) => {
+router.post("/", async (req, res) => {
   const { url, name } = req.body;
 
   console.log("POST /api/youtube called with:", { url, name });
