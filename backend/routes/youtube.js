@@ -14,34 +14,70 @@ const progressLoops = new Map();
 const MAX_DURATION_MINUTES = parseInt(process.env.MAX_DURATION || '20', 10);
 const MAX_DURATION_SECONDS = MAX_DURATION_MINUTES * 60;
 
-// Simple adjustable queue for yt-dlp download concurrency
-const MAX_CONCURRENT_DOWNLOADS = Math.max(1, parseInt(process.env.MAX_CONCURRENT_DOWNLOADS || '1', 10));
-let activeDownloadWorkers = 0;
-const downloadQueue = [];
+// Per-site adjustable queue for yt-dlp download concurrency
+const MAX_CONCURRENT_DOWNLOADS_PER_SITE = Math.max(
+  1,
+  parseInt(process.env.MAX_CONCURRENT_DOWNLOADS_PER_SITE || process.env.MAX_CONCURRENT_DOWNLOADS || '1', 10)
+);
 
-function runNextDownloadJob() {
-  while (activeDownloadWorkers < MAX_CONCURRENT_DOWNLOADS && downloadQueue.length > 0) {
-    const job = downloadQueue.shift();
+const siteQueues = new Map(); // siteKey -> { active: number, queue: Array<Function> }
+
+function getSiteKeyFromUrl(url) {
+  try {
+    const u = new URL(url);
+    const rawHost = (u.hostname || '').toLowerCase();
+    const host = rawHost.replace(/^www\./, '');
+
+    // Canonicalize known platform domains and shorteners to the same group key
+    if (host === 'youtu.be' || host.endsWith('.youtube.com')) return 'youtube';
+    if (host === 'x.com' || host === 'twitter.com' || host === 't.co' || host.endsWith('.twitter.com')) return 'twitter';
+    if (host === 'tiktok.com' || host.endsWith('.tiktok.com') || host === 'vt.tiktok.com') return 'tiktok';
+    if (host === 'instagram.com' || host.endsWith('.instagram.com') || host === 'instagr.am') return 'instagram';
+    if (host === 'twitch.tv' || host.endsWith('.twitch.tv') || host === 'clips.twitch.tv') return 'twitch';
+    if (host === 'kick.com' || host.endsWith('.kick.com')) return 'kick';
+    if (host === 'facebook.com' || host.endsWith('.facebook.com') || host === 'fb.watch' || host === 'fb.com') return 'facebook';
+    if (host === 'reddit.com' || host.endsWith('.reddit.com') || host === 'redd.it') return 'reddit';
+    if (host === 'soundcloud.com' || host.endsWith('.soundcloud.com')) return 'soundcloud';
+    if (host === 'vimeo.com' || host.endsWith('.vimeo.com')) return 'vimeo';
+
+    return host; // fallback to normalized host as the key
+  } catch (_) {
+    return 'other';
+  }
+}
+
+function runNextForSite(siteKey) {
+  const state = siteQueues.get(siteKey);
+  if (!state) return;
+  while (state.active < MAX_CONCURRENT_DOWNLOADS_PER_SITE && state.queue.length > 0) {
+    const job = state.queue.shift();
     try { job(); } catch (_) {}
   }
 }
 
-function enqueueDownloadJob(startFn) {
+function enqueueSiteDownloadJob(url, startFn) {
+  const siteKey = getSiteKeyFromUrl(url);
+  let state = siteQueues.get(siteKey);
+  if (!state) {
+    state = { active: 0, queue: [] };
+    siteQueues.set(siteKey, state);
+  }
+
   return new Promise((resolve, reject) => {
     const job = async () => {
-      activeDownloadWorkers++;
+      state.active++;
       try {
         const result = await startFn();
         resolve(result);
       } catch (e) {
         reject(e);
       } finally {
-        activeDownloadWorkers--;
-        runNextDownloadJob();
+        state.active--;
+        runNextForSite(siteKey);
       }
     };
-    downloadQueue.push(job);
-    runNextDownloadJob();
+    state.queue.push(job);
+    runNextForSite(siteKey);
   });
 }
 
@@ -529,8 +565,8 @@ router.post("/", (req, res) => {
         videoDuration: videoDuration
       });
 
-      // Enqueue the actual yt-dlp download so we never exceed MAX_CONCURRENT_DOWNLOADS
-      void enqueueDownloadJob(() => new Promise((resolve) => {
+      // Enqueue the actual yt-dlp download so we never exceed per-site concurrency
+      void enqueueSiteDownloadJob(url, () => new Promise((resolve) => {
         // Mark as downloading when slot is available
         const dl0 = activeDownloads.get(downloadId);
         if (dl0) dl0.status = 'downloading';
