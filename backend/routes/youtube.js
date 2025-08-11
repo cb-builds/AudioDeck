@@ -10,6 +10,10 @@ const { writeExpiryMeta } = require('../utils/expiry');
 const activeDownloads = new Map();
 const progressLoops = new Map();
 
+// Config: max duration gate (minutes -> seconds)
+const MAX_DURATION_MINUTES = parseInt(process.env.MAX_DURATION || '20', 10);
+const MAX_DURATION_SECONDS = MAX_DURATION_MINUTES * 60;
+
 // Simple adjustable queue for yt-dlp download concurrency
 const MAX_CONCURRENT_DOWNLOADS = Math.max(1, parseInt(process.env.MAX_CONCURRENT_DOWNLOADS || '1', 10));
 let activeDownloadWorkers = 0;
@@ -282,8 +286,7 @@ router.get("/duration", async (req, res) => {
         durationSeconds = parts[0];
       }
 
-      const maxDuration = 10 * 60; // 10 minutes in seconds
-      const isTooLong = durationSeconds > maxDuration;
+      const isTooLong = durationSeconds > MAX_DURATION_SECONDS;
 
       res.json({ 
         duration: durationSeconds, 

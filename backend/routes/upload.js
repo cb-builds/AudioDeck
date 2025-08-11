@@ -10,6 +10,10 @@ const CLIPS_DIR = path.join(__dirname, "../clips");
 // Ensure clips directory exists
 if (!fs.existsSync(CLIPS_DIR)) fs.mkdirSync(CLIPS_DIR);
 
+// Config: upload max duration (minutes -> seconds)
+const MAX_UPLOAD_DURATION_MINUTES = parseInt(process.env.MAX_UPLOAD_DURATION || '20', 10);
+const MAX_UPLOAD_DURATION_SECONDS = MAX_UPLOAD_DURATION_MINUTES * 60;
+
 // Helper function to check if file is video
 const isVideoFile = (filename) => {
   const videoExtensions = ['.mp4', '.webm', '.ogg', '.avi', '.mov', '.wmv', '.flv', '.mkv'];
@@ -84,6 +88,12 @@ router.post("/", (req, res) => {
             console.log("ffmpeg stderr:", durationStderr);
           }
           
+          // Enforce upload duration limit for extracted audio
+          if (videoDuration > MAX_UPLOAD_DURATION_SECONDS) {
+            try { fs.unlinkSync(savePath); } catch (_) {}
+            return res.status(422).send(`Uploaded video exceeds max length of ${MAX_UPLOAD_DURATION_MINUTES} minutes.`);
+          }
+
           // Write expiry metadata
           const meta = writeExpiryMeta(savePath, { originalFilename });
           res.json({ 
@@ -123,6 +133,12 @@ router.post("/", (req, res) => {
           console.log("ffmpeg stderr:", durationStderr);
         }
         
+        // Enforce upload duration limit for audio
+        if (videoDuration > MAX_UPLOAD_DURATION_SECONDS) {
+          try { fs.unlinkSync(savePath); } catch (_) {}
+          return res.status(422).send(`Uploaded audio exceeds max length of ${MAX_UPLOAD_DURATION_MINUTES} minutes.`);
+        }
+
         // Write expiry metadata
         const meta = writeExpiryMeta(savePath, { originalFilename });
         res.json({ 
