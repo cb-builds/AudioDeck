@@ -14,6 +14,68 @@ const progressLoops = new Map();
 const MAX_DURATION_MINUTES = parseInt(process.env.MAX_DURATION || '20', 10);
 const MAX_DURATION_SECONDS = MAX_DURATION_MINUTES * 60;
 
+// Simple in-memory metadata cache with single-flight per URL
+const META_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+const metadataCache = new Map(); // url -> { title, duration, durationFormatted, fetchedAt }
+const metadataInFlight = new Map(); // url -> Promise
+
+function parseDurationToSeconds(durationStr) {
+  const parts = String(durationStr).trim().split(':').map(Number);
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  return Number.isFinite(parts[0]) ? parts[0] : 0;
+}
+
+function buildMetaCmd(url) {
+  if (url.includes('twitch.tv')) {
+    return `yt-dlp -4 --no-playlist --get-title --get-duration --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.twitch.tv/" --add-header "Client-Id:kimne78kx3ncx6brgo4mv6wki5h1ko" "${url}"`;
+  }
+  return `yt-dlp -4 --no-playlist --get-title --get-duration --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${url}"`;
+}
+
+function getCachedMetadata(url) {
+  const entry = metadataCache.get(url);
+  if (!entry) return null;
+  if (Date.now() - entry.fetchedAt > META_TTL_MS) {
+    metadataCache.delete(url);
+    return null;
+  }
+  return entry;
+}
+
+async function getMetadata(url) {
+  const cached = getCachedMetadata(url);
+  if (cached) return cached;
+
+  if (metadataInFlight.has(url)) {
+    return metadataInFlight.get(url);
+  }
+
+  const promise = new Promise((resolve, reject) => {
+    const cmd = buildMetaCmd(url);
+    exec(cmd, (err, stdout, stderr) => {
+      if (err) {
+        console.error("metadata exec error:", err);
+        console.error("stderr:", stderr);
+        metadataInFlight.delete(url);
+        return reject(err);
+      }
+      const lines = stdout.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      // Expect two lines: title then duration string
+      const title = lines[0] || '';
+      const durationStr = lines[1] || '';
+      const duration = parseDurationToSeconds(durationStr);
+      const entry = { title, duration, durationFormatted: durationStr, fetchedAt: Date.now() };
+      metadataCache.set(url, entry);
+      metadataInFlight.delete(url);
+      resolve(entry);
+    });
+  });
+
+  metadataInFlight.set(url, promise);
+  return promise;
+}
+
 // Per-site adjustable queue for yt-dlp download concurrency
 const MAX_CONCURRENT_DOWNLOADS_PER_SITE = Math.max(
   1,
@@ -265,78 +327,12 @@ router.get("/duration", async (req, res) => {
   }
 
   try {
-    // Use yt-dlp to get audio/video duration
-    let durationCmd;
-    if (url.includes('twitch.tv')) {
-      // Enhanced Twitch duration extraction with proper headers
-      console.log("Checking duration for Twitch URL:", url);
-      
-      durationCmd = `yt-dlp -4 --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.twitch.tv/" --add-header "Client-Id:kimne78kx3ncx6brgo4mv6wki5h1ko" "${url}"`;
-    } else {
-      // Standard command for other platforms
-      durationCmd = `yt-dlp -4 --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${url}"`;
-    }
-    
-    exec(durationCmd, (err, stdout, stderr) => {
-      if (err) {
-        console.error("Duration check error:", err);
-        console.error("stderr:", stderr);
-        const errText = `${stderr || ''}`;
-        // Hard-fail on obvious bad URLs or HTTP errors so frontend cancels early
-        if (/HTTP\s+Error|Unsupported URL|Unable to download webpage/i.test(errText)) {
-          return res.status(400).json({ error: "Output file not found. Please check link and try again." });
-        }
-        // Otherwise, allow proceeding as before
-        return res.json({ 
-          duration: 0, 
-          isTooLong: false,
-          message: "Could not check duration, proceeding with download" 
-        });
-      }
-
-      const durationStr = stdout.trim();
-      if (!durationStr) {
-        const errText = `${stderr || ''}`;
-        if (/HTTP\s+Error|Unsupported URL|Unable to download webpage/i.test(errText)) {
-          return res.status(400).json({ error: "Output file not found. Please check link and try again." });
-        }
-        return res.json({ 
-          duration: 0, 
-          isTooLong: false,
-          message: "No duration found, proceeding with download" 
-        });
-      }
-
-      // Parse duration string (format: HH:MM:SS or MM:SS)
-      const parts = durationStr.split(':').map(Number);
-      let durationSeconds = 0;
-      
-      if (parts.length === 3) {
-        // HH:MM:SS format
-        durationSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
-      } else if (parts.length === 2) {
-        // MM:SS format
-        durationSeconds = parts[0] * 60 + parts[1];
-      } else {
-        // Just seconds
-        durationSeconds = parts[0];
-      }
-
-      const isTooLong = durationSeconds > MAX_DURATION_SECONDS;
-
-      res.json({ 
-        duration: durationSeconds, 
-        isTooLong: isTooLong,
-        durationFormatted: durationStr
-      });
-    });
+    const meta = await getMetadata(url);
+    const isTooLong = meta.duration > MAX_DURATION_SECONDS;
+    res.json({ duration: meta.duration, isTooLong, durationFormatted: meta.durationFormatted });
   } catch (error) {
     console.error("Duration check failed:", error);
-    res.json({ 
-      duration: 0, 
-      isTooLong: false,
-      message: "Duration check failed, proceeding with download" 
-    });
+    res.json({ duration: 0, isTooLong: false, message: "Duration check failed, proceeding with download" });
   }
 });
 
@@ -349,53 +345,10 @@ router.get("/title", async (req, res) => {
   }
 
   try {
-    // Use yt-dlp to get audio/video title with better TikTok and Twitch support
-    let titleCmd;
-    if (url.includes('twitch.tv')) {
-      // Enhanced Twitch title extraction with proper headers
-      console.log("Extracting title for Twitch URL:", url);
-      
-      // Check if it's a clip URL
-      if (url.includes('/clip/')) {
-        console.log("Processing Twitch clip for title extraction");
-        titleCmd = `yt-dlp -4 --get-title --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.twitch.tv/" --add-header "Client-Id:kimne78kx3ncx6brgo4mv6wki5h1ko" "${url}"`;
-      } else {
-        console.log("Processing Twitch stream/VOD for title extraction");
-        titleCmd = `yt-dlp -4 --get-title --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.twitch.tv/" --add-header "Client-Id:kimne78kx3ncx6brgo4mv6wki5h1ko" "${url}"`;
-      }
-    } else {
-      // Standard command for other platforms
-      titleCmd = `yt-dlp -4 --get-title --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${url}"`;
-    }
-    
-    exec(titleCmd, (err, stdout, stderr) => {
-      if (err) {
-        console.error("Title extraction error:", err);
-        console.error("stderr:", stderr);
-        const errText = `${stderr || ''}`;
-        if (/HTTP\s+Error|Unsupported URL|Unable to download webpage/i.test(errText)) {
-          return res.status(400).json({ error: "Output file not found. Please check link and try again." });
-        }
-        
-        // Existing fallbacks (TikTok/Twitch) follow here if desired
-        // Otherwise generic error:
-        return res.status(500).json({ error: "Could not extract audio/video title", details: err.message });
-      }
-
-      const title = stdout.trim();
-      if (!title) {
-        const errText = `${stderr || ''}`;
-        if (/HTTP\s+Error|Unsupported URL|Unable to download webpage/i.test(errText)) {
-          return res.status(400).json({ error: "Output file not found. Please check link and try again." });
-        }
-        return res.status(404).json({ error: "No title found for this audio/video" });
-      }
-
-      // Truncate title if it's too long
-      const truncatedTitle = title.length > 100 ? title.substring(0, 97) + '...' : title;
-
-      res.json({ title: truncatedTitle });
-    });
+    const meta = await getMetadata(url);
+    const title = meta.title || '';
+    const truncatedTitle = title.length > 100 ? title.substring(0, 97) + '...' : title;
+    res.json({ title: truncatedTitle });
   } catch (error) {
     console.error("Title extraction failed:", error);
     res.status(500).json({ error: "Audio/video title extraction failed", details: error.message });
@@ -442,65 +395,22 @@ router.post("/", (req, res) => {
   // Start progress loop for WS consumers
   startProgressLoop(downloadId);
 
-  console.log("Starting duration extraction...");
-
-  // Extract video duration first
-  let durationCmd;
-  if (url.includes('twitch.tv')) {
-    durationCmd = `yt-dlp -4 --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.twitch.tv/" --add-header "Client-Id:kimne78kx3ncx6brgo4mv6wki5h1ko" "${url}"`;
-  } else if (url.includes('twitter.com') || url.includes('x.com')) {
-    durationCmd = `yt-dlp -4 --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://twitter.com/" "${url}"`;
-  } else if (url.includes('instagram.com')) {
-    durationCmd = `yt-dlp -4 --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.instagram.com/" "${url}"`;
-  } else {
-    durationCmd = `yt-dlp -4 --get-duration --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${url}"`;
-  }
-
-  console.log("About to execute duration command:", durationCmd);
-  exec(durationCmd, (durationErr, durationStdout, durationStderr) => {
-    console.log("Duration extraction started for URL:", url);
-    console.log("Duration command:", durationCmd);
-
-    if (durationErr) {
-      const errText = `${durationStderr || ''}`;
-      if (/HTTP\s+Error|Unsupported URL|Unable to download webpage/i.test(errText)) {
-        const dl = activeDownloads.get(downloadId);
-        if (dl) {
-          dl.status = 'error';
-          dl.error = 'Output file not found. Please try again';
-        }
-        return; // Hard-cancel pipeline silently (frontend will timeout on progress)
-      }
-    }
-
-    let videoDuration = 0;
-    if (!durationErr && durationStdout.trim()) {
-      const durationStr = durationStdout.trim();
-      console.log("Raw duration string:", durationStr);
-      const parts = durationStr.split(':').map(Number);
-      console.log("Duration parts:", parts);
-      if (parts.length === 3) {
-        videoDuration = parts[0] * 3600 + parts[1] * 60 + parts[2];
-      } else if (parts.length === 2) {
-        videoDuration = parts[0] * 60 + parts[1];
-      } else {
-        videoDuration = parts[0];
-      }
-      console.log("Video duration extracted:", videoDuration, "seconds");
-    } else {
-      console.log("Could not extract duration, proceeding with download");
-      console.log("Duration error details:", durationErr);
-      console.log("Duration stdout details:", durationStdout);
-    }
-    
+  console.log("Starting metadata fetch (title + duration)...");
+  let videoDuration = 0;
+  try {
+    const meta = await getMetadata(url);
+    videoDuration = Math.max(0, Math.floor(meta.duration || 0));
     const download = activeDownloads.get(downloadId);
     if (download) {
       download.videoDuration = videoDuration;
     }
+  } catch (e) {
+    console.warn("Metadata fetch failed, proceeding without duration:", e && e.message);
+  }
 
     // Probe expected filesize (approx) for the selected format to set a stable total
-    const sizeCmd = `yt-dlp -4 -f "bestaudio/best" --print "%(filesize_approx)d" --no-warnings --no-playlist --no-download "${url}"`;
-    exec(sizeCmd, (sizeErr, sizeStdout, sizeStderr) => {
+      const sizeCmd = `yt-dlp -4 -f "bestaudio/best" --print "%(filesize_approx)d" --no-warnings --no-playlist --no-download "${url}"`;
+      exec(sizeCmd, (sizeErr, sizeStdout, sizeStderr) => {
       let expectedBytes = 0;
       if (!sizeErr && sizeStdout) {
         const out = sizeStdout.toString().trim();
