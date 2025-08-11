@@ -10,6 +10,37 @@ const { writeExpiryMeta } = require('../utils/expiry');
 const activeDownloads = new Map();
 const progressLoops = new Map();
 
+// Simple adjustable queue for yt-dlp download concurrency
+const MAX_CONCURRENT_DOWNLOADS = Math.max(1, parseInt(process.env.MAX_CONCURRENT_DOWNLOADS || '1', 10));
+let activeDownloadWorkers = 0;
+const downloadQueue = [];
+
+function runNextDownloadJob() {
+  while (activeDownloadWorkers < MAX_CONCURRENT_DOWNLOADS && downloadQueue.length > 0) {
+    const job = downloadQueue.shift();
+    try { job(); } catch (_) {}
+  }
+}
+
+function enqueueDownloadJob(startFn) {
+  return new Promise((resolve, reject) => {
+    const job = async () => {
+      activeDownloadWorkers++;
+      try {
+        const result = await startFn();
+        resolve(result);
+      } catch (e) {
+        reject(e);
+      } finally {
+        activeDownloadWorkers--;
+        runNextDownloadJob();
+      }
+    };
+    downloadQueue.push(job);
+    runNextDownloadJob();
+  });
+}
+
 function startProgressLoop(downloadId) {
   if (progressLoops.has(downloadId)) return;
   const interval = setInterval(() => {
@@ -363,7 +394,7 @@ router.post("/", (req, res) => {
     progress: 0,
     downloadedBytes: 0,
     totalBytes: 0,
-    status: 'downloading',
+    status: 'queued',
     videoDuration: 0, // Store video duration
     outputPath: outputPath, // Store the output path for progress tracking
     expectedTotalBytes: 0
@@ -485,96 +516,79 @@ router.post("/", (req, res) => {
         ytCmd = `yt-dlp -4 -f bestaudio --extract-audio --audio-format mp3 --no-playlist --no-warnings --no-progress --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -o "${outputPath}" "${url}"`;
       }
       
-      console.log("Running:", ytCmd);
+      console.log("Queued download:", ytCmd);
 
       // Return the downloadId and duration immediately
       res.json({ 
-        message: "Download started", 
+        message: "Download started",
+        queued: true,
         downloadId: downloadId,
         videoDuration: videoDuration
       });
 
-      // Parse progress from yt-dlp output
-      const child = exec(ytCmd, (err, stdout, stderr) => {
-        if (err) {
-          console.error("yt-dlp error:", err);
-          console.error("stderr:", stderr);
-          
-          
-          // Update download status
-          const dl = activeDownloads.get(downloadId);
-          if (dl) {
-            dl.status = 'error';
-            dl.error = err.message;
+      // Enqueue the actual yt-dlp download so we never exceed MAX_CONCURRENT_DOWNLOADS
+      void enqueueDownloadJob(() => new Promise((resolve) => {
+        // Mark as downloading when slot is available
+        const dl0 = activeDownloads.get(downloadId);
+        if (dl0) dl0.status = 'downloading';
+
+        // Parse progress from yt-dlp output
+        const child = exec(ytCmd, (err, stdout, stderr) => {
+          if (err) {
+            console.error("yt-dlp error:", err);
+            console.error("stderr:", stderr);
+            const dl = activeDownloads.get(downloadId);
+            if (dl) {
+              dl.status = 'error';
+              dl.error = err.message;
+            }
           }
-          
-          // Note: Can't send error response since we already sent the initial response
-          // The frontend will handle errors via SSE
-          console.error("Download failed:", err.message);
-        }
 
-        
-
-        // Check if file exists before checking size
-        try {
-          const dl = activeDownloads.get(downloadId);
-          const filePath = dl ? dl.outputPath : outputPath;
-          
-          if (fs.existsSync(filePath)) {
-            // Check file size (25MB limit)
-            const maxSize = 25 * 1024 * 1024; // 25MB in bytes
-            const stats = fs.statSync(filePath);
-            if (stats.size > maxSize) {
-              fs.unlinkSync(filePath);
-              // Update download status
-              if (dl) {
-                dl.status = 'error';
-                dl.error = 'File too large';
-              }
-              // Note: Can't send error response since we already sent the initial response
-              console.error("File too large: File exceeds 25MB limit");
-            } else {
-              // Write expiry metadata for the finalized clip
-              try { writeExpiryMeta(filePath, { originalFilename: path.basename(filePath) }); } catch (_) {}
-              // Update download status to complete
-              if (dl) {
+          // Check if file exists before checking size
+          try {
+            const dl = activeDownloads.get(downloadId);
+            const filePath = dl ? dl.outputPath : outputPath;
+            if (fs.existsSync(filePath)) {
+              const maxSize = 25 * 1024 * 1024; // 25MB
+              const stats = fs.statSync(filePath);
+              if (stats.size > maxSize) {
+                fs.unlinkSync(filePath);
+                if (dl) { dl.status = 'error'; dl.error = 'File too large'; }
+                console.error("File too large: File exceeds 25MB limit");
+              } else if (dl) {
+                try { writeExpiryMeta(filePath, { originalFilename: path.basename(filePath) }); } catch (_) {}
                 dl.status = 'complete';
                 dl.progress = 100;
                 dl.downloadedBytes = stats.size;
-                dl.totalBytes = stats.size; // Set actual final size
+                dl.totalBytes = stats.size;
                 console.log(`Download completed: ${stats.size} bytes`);
               }
+            } else {
+              console.error("Download failed: Output file not found. Please try again");
+              if (dl) { dl.status = 'error'; dl.error = 'Output file not found. Please try again'; }
             }
-          } else {
-            // File doesn't exist, which means download failed
-            console.error("Download failed: Output file not found. Please try again");
-            if (dl) {
-              dl.status = 'error';
-              dl.error = 'Output file not found. Please try again';
-            }
+          } catch (fileError) {
+            console.error("Error checking file:", fileError);
+            const dl = activeDownloads.get(downloadId);
+            if (dl) { dl.status = 'error'; dl.error = 'Error checking file'; }
           }
-        } catch (fileError) {
-          console.error("Error checking file:", fileError);
-          if (dl) {
-            dl.status = 'error';
-            dl.error = 'Error checking file';
-          }
-        }
-      });
+          resolve();
+        });
 
-      // Optional: suppress chatty progress lines
-      child.stdout.on('data', (data) => {
-        const output = data.toString();
-        if (output.includes('ERROR') || output.includes('WARNING')) {
-          console.log("yt-dlp output:", output);
-        }
-      });
-      child.stderr.on('data', (data) => {
-        const output = data.toString();
-        if (output.includes('ERROR') || output.includes('WARNING')) {
-          console.log("yt-dlp stderr:", output);
-        }
-      });
+        // Optional: suppress chatty progress lines
+        child.stdout.on('data', (data) => {
+          const output = data.toString();
+          if (output.includes('ERROR') || output.includes('WARNING')) {
+            console.log("yt-dlp output:", output);
+          }
+        });
+        child.stderr.on('data', (data) => {
+          const output = data.toString();
+          if (output.includes('ERROR') || output.includes('WARNING')) {
+            console.log("yt-dlp stderr:", output);
+          }
+        });
+      }));
     }); // end exec(sizeCmd)
   }); // end exec(durationCmd)
 }); // end router.post
