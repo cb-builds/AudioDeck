@@ -15,7 +15,11 @@ services:
       - NODE_ENV=development
       - PORT=4000
       - MAX_FILE_SIZE=26214400
-      - MAX_DURATION=1200
+      # Durations are in minutes in the app code
+      - MAX_DURATION=20
+      - MAX_UPLOAD_DURATION=20
+      # Concurrency per canonical site (youtube, tiktok, etc.)
+      - MAX_CONCURRENT_DOWNLOADS_PER_SITE=1
       - CLEANUP_INTERVAL=60000 # currently unused; cleanup runs every 1m in code
       - CLIP_TTL_MINUTES=60
       - MAX_STORAGE=524288000
