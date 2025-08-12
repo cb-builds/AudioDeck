@@ -14,6 +14,10 @@ const progressLoops = new Map();
 const MAX_DURATION_MINUTES = parseInt(process.env.MAX_DURATION || '20', 10);
 const MAX_DURATION_SECONDS = MAX_DURATION_MINUTES * 60;
 
+// Cookie/env config
+const USE_BROWSER_COOKIES = String(process.env.USE_BROWSER_COOKIES || 'false').toLowerCase() === 'true';
+const BROWSER_PROFILE_MOUNT_PATH = process.env.BROWSER_PROFILE_MOUNT_PATH || '/browser_profile';
+
 // Simple in-memory metadata cache with single-flight per URL
 const META_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 const metadataCache = new Map(); // url -> { title, duration, durationFormatted, fetchedAt }
@@ -52,24 +56,40 @@ async function getMetadata(url) {
   }
 
   const promise = new Promise((resolve, reject) => {
-    const cmd = buildMetaCmd(url);
-    exec(cmd, (err, stdout, stderr) => {
-      if (err) {
-        console.error("metadata exec error:", err);
-        console.error("stderr:", stderr);
+    const baseCmd = buildMetaCmd(url);
+    const isYouTube = /(^|\.)youtube\.com$|youtu\.be$/i.test(new URL(url).hostname);
+
+    const cookiesArg = isYouTube ? getYoutubeCookiesArg() : '';
+    const cmdWithCookies = cookiesArg ? `${baseCmd} ${cookiesArg}` : baseCmd;
+
+    const runExec = (cmdStr, allowFallback) => {
+      exec(cmdStr, (err, stdout, stderr) => {
+        if (err) {
+          if (allowFallback && cookiesArg && isLikelyCookieAuthError(stderr || '')) {
+            // Retry once without cookies
+            return runExec(baseCmd, false);
+          }
+          console.error("metadata exec error:", err);
+          console.error("stderr:", stderr);
+          metadataInFlight.delete(url);
+          return reject(err);
+        }
+        const lines = stdout.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        const title = lines[0] || '';
+        const durationStr = lines[1] || '';
+        const duration = parseDurationToSeconds(durationStr);
+        const entry = { title, duration, durationFormatted: durationStr, fetchedAt: Date.now() };
+        metadataCache.set(url, entry);
         metadataInFlight.delete(url);
-        return reject(err);
-      }
-      const lines = stdout.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-      // Expect two lines: title then duration string
-      const title = lines[0] || '';
-      const durationStr = lines[1] || '';
-      const duration = parseDurationToSeconds(durationStr);
-      const entry = { title, duration, durationFormatted: durationStr, fetchedAt: Date.now() };
-      metadataCache.set(url, entry);
-      metadataInFlight.delete(url);
-      resolve(entry);
-    });
+        resolve(entry);
+      });
+    };
+
+    // Ensure per-site queue discipline
+    enqueueSiteJob(url, () => new Promise((r) => {
+      runExec(cmdWithCookies, true);
+      r();
+    }));
   });
 
   metadataInFlight.set(url, promise);
@@ -141,6 +161,77 @@ function enqueueSiteDownloadJob(url, startFn) {
     state.queue.push(job);
     runNextForSite(siteKey);
   });
+}
+
+// Generic site job queue (metadata and others)
+function enqueueSiteJob(url, startFn) {
+  return enqueueSiteDownloadJob(url, startFn);
+}
+
+// Firefox profile discovery for cookies-from-browser
+let cachedFirefoxProfileDir = null;
+function findFirefoxProfileDir() {
+  if (cachedFirefoxProfileDir !== null) return cachedFirefoxProfileDir;
+  try {
+    const iniPath = path.join(BROWSER_PROFILE_MOUNT_PATH, '.mozilla', 'firefox', 'profiles.ini');
+    if (!fs.existsSync(iniPath)) {
+      cachedFirefoxProfileDir = null;
+      return null;
+    }
+    const content = fs.readFileSync(iniPath, 'utf8');
+    const lines = content.split(/\r?\n/);
+    const profiles = [];
+    let current = {};
+    for (const line of lines) {
+      if (/^\s*\[Profile/i.test(line)) {
+        if (Object.keys(current).length) profiles.push(current);
+        current = {};
+      } else if (/^\s*Path\s*=/.test(line)) {
+        current.Path = line.split('=')[1].trim();
+      } else if (/^\s*IsRelative\s*=/.test(line)) {
+        current.IsRelative = line.split('=')[1].trim();
+      } else if (/^\s*Default\s*=/.test(line)) {
+        current.Default = line.split('=')[1].trim();
+      }
+    }
+    if (Object.keys(current).length) profiles.push(current);
+    let chosen = profiles.find(p => String(p.Default || '').trim() === '1') || profiles[0];
+    if (!chosen || !chosen.Path) {
+      cachedFirefoxProfileDir = null;
+      return null;
+    }
+    const isRel = String(chosen.IsRelative || '1').trim() === '1';
+    const absPath = isRel
+      ? path.join(BROWSER_PROFILE_MOUNT_PATH, '.mozilla', 'firefox', chosen.Path)
+      : chosen.Path;
+    cachedFirefoxProfileDir = absPath;
+    return absPath;
+  } catch (e) {
+    cachedFirefoxProfileDir = null;
+    return null;
+  }
+}
+
+function getYoutubeCookiesArg() {
+  if (!USE_BROWSER_COOKIES) return '';
+  const dir = findFirefoxProfileDir();
+  if (!dir) return '';
+  return `--cookies-from-browser "firefox:${dir}"`;
+}
+
+function isLikelyCookieAuthError(stderr) {
+  const s = String(stderr || '').toLowerCase();
+  return /403|429|cookie|auth|login|required|consent|rate.?limit/.test(s);
+}
+
+// Startup health log
+if (USE_BROWSER_COOKIES) {
+  const dir = findFirefoxProfileDir();
+  if (!dir) {
+    console.warn('[cookies] USE_BROWSER_COOKIES is enabled but no Firefox profile detected under', path.join(BROWSER_PROFILE_MOUNT_PATH, '.mozilla', 'firefox'));
+  } else {
+    console.log('[cookies] Firefox profile detected at', dir);
+  }
 }
 
 function startProgressLoop(downloadId) {
