@@ -408,6 +408,22 @@ router.post("/", async (req, res) => {
     console.warn("Metadata fetch failed, proceeding without duration:", e && e.message);
   }
 
+  // Server-side duration gate (cancel early if too long)
+  if (videoDuration > MAX_DURATION_SECONDS) {
+    // Mark download as error for any listeners
+    const dl = activeDownloads.get(downloadId);
+    if (dl) {
+      dl.status = 'error';
+      dl.error = `Video is too long. Max duration is ${Math.floor(MAX_DURATION_SECONDS / 60)} minutes.`;
+    }
+    return res.status(422).json({
+      error: 'Video is too long',
+      reason: 'too_long',
+      duration: videoDuration,
+      maxDuration: MAX_DURATION_SECONDS
+    });
+  }
+
     // Probe expected filesize (approx) for the selected format to set a stable total
       const sizeCmd = `yt-dlp -4 -f "bestaudio/best" --print "%(filesize_approx)d" --no-warnings --no-playlist --no-download "${url}"`;
       exec(sizeCmd, (sizeErr, sizeStdout, sizeStderr) => {
