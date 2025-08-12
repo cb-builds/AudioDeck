@@ -539,7 +539,6 @@ router.post("/", async (req, res) => {
         });
       }));
     }); // end exec(sizeCmd)
-  }); // end exec(durationCmd)
 }); // end router.post
 
 module.exports = router;
