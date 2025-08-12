@@ -19,7 +19,7 @@ const USE_BROWSER_COOKIES = String(process.env.USE_BROWSER_COOKIES || 'false').t
 const BROWSER_PROFILE_MOUNT_PATH = process.env.BROWSER_PROFILE_MOUNT_PATH || '/browser_profile';
 
 // Simple in-memory metadata cache with single-flight per URL
-const META_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+const META_TTL_MS = 10 * 60 * 1000; // 10 minutes short-lived cache
 const metadataCache = new Map(); // url -> { title, duration, durationFormatted, fetchedAt }
 const metadataInFlight = new Map(); // url -> Promise
 
@@ -35,6 +35,16 @@ function buildMetaCmd(url) {
     return `yt-dlp -4 --no-playlist --get-title --get-duration --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.twitch.tv/" --add-header "Client-Id:kimne78kx3ncx6brgo4mv6wki5h1ko" "${url}"`;
   }
   return `yt-dlp -4 --no-playlist --get-title --get-duration --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${url}"`;
+}
+
+function isYouTubeUrl(url) {
+  try {
+    const u = new URL(url);
+    const h = u.hostname.toLowerCase();
+    return h === 'youtu.be' || h.endsWith('.youtube.com');
+  } catch (_) {
+    return false;
+  }
 }
 
 function getCachedMetadata(url) {
@@ -57,38 +67,37 @@ async function getMetadata(url) {
 
   const promise = new Promise((resolve, reject) => {
     const baseCmd = buildMetaCmd(url);
-    const isYouTube = /(^|\.)youtube\.com$|youtu\.be$/i.test(new URL(url).hostname);
-
-    const cookiesArg = isYouTube ? getYoutubeCookiesArg() : '';
+    const useYT = isYouTubeUrl(url);
+    const cookiesArg = useYT ? getYoutubeCookiesArg() : '';
     const cmdWithCookies = cookiesArg ? `${baseCmd} ${cookiesArg}` : baseCmd;
 
-    const runExec = (cmdStr, allowFallback) => {
-      exec(cmdStr, (err, stdout, stderr) => {
-        if (err) {
-          if (allowFallback && cookiesArg && isLikelyCookieAuthError(stderr || '')) {
-            // Retry once without cookies
-            return runExec(baseCmd, false);
+    enqueueSiteJob(url, () => new Promise((queueResolve) => {
+      const runExec = (cmdStr, allowFallback) => {
+        exec(cmdStr, (err, stdout, stderr) => {
+          if (err) {
+            if (allowFallback && cookiesArg && isLikelyCookieAuthError(stderr || '')) {
+              // Retry once without cookies
+              return runExec(baseCmd, false);
+            }
+            console.error("metadata exec error:", err);
+            console.error("stderr:", stderr);
+            metadataInFlight.delete(url);
+            reject(err);
+            return queueResolve();
           }
-          console.error("metadata exec error:", err);
-          console.error("stderr:", stderr);
+          const lines = stdout.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+          const title = lines[0] || '';
+          const durationStr = lines[1] || '';
+          const duration = parseDurationToSeconds(durationStr);
+          const entry = { title, duration, durationFormatted: durationStr, fetchedAt: Date.now() };
+          metadataCache.set(url, entry);
           metadataInFlight.delete(url);
-          return reject(err);
-        }
-        const lines = stdout.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-        const title = lines[0] || '';
-        const durationStr = lines[1] || '';
-        const duration = parseDurationToSeconds(durationStr);
-        const entry = { title, duration, durationFormatted: durationStr, fetchedAt: Date.now() };
-        metadataCache.set(url, entry);
-        metadataInFlight.delete(url);
-        resolve(entry);
-      });
-    };
+          resolve(entry);
+          return queueResolve();
+        });
+      };
 
-    // Ensure per-site queue discipline
-    enqueueSiteJob(url, () => new Promise((r) => {
       runExec(cmdWithCookies, true);
-      r();
     }));
   });
 

@@ -271,6 +271,24 @@ const UploadForm = ({ onFileUploaded, onDownloadComplete, onExternalUploadStarte
       }
 
       const data = await res.json();
+      if (!res.ok) {
+        // Backend signaled a specific error; surface friendly message
+        const message = (data && data.error) || 'Download failed';
+        hideProgress();
+        // Special YouTube fallback messaging when cookies unavailable
+        if (/youtube/i.test(urlForFetch) && /not available|cookies|auth|login/i.test(message)) {
+          showErrorPopup(
+            '❌ YouTube Unavailable',
+            'YouTube requests are not available at this time. Please try again later.'
+          );
+          setStatus('YouTube unavailable. Please try again later.');
+        } else {
+          showErrorPopup('❌ Download Failed', message);
+          setStatus(`Download failed: ${message}`);
+        }
+        setIsVideoUploading(false);
+        return;
+      }
       updateProgress(100, "Upload complete!");
       console.log("Upload response data:", data);
       setStatus(`Uploaded as: ${data.filename}`);
